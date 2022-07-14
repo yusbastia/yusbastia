@@ -1,7 +1,7 @@
 ######################################
-#[ KocHiWalker@Gmail.Com            ]#
-#[ uKi` @ Dalnet&Allnetwork         ]#
-#[ - idleversion.tcl (Ocr 2018)     ]#
+#[ yuslemon91@Gmail.Com            ]#
+#[ Lemon @ Allnetwork         ]#
+#[ - idle.tcl (Ocr 2018)     ]#
 #[ for eggdrop 1.8.*                ]#
 ######################################
 
@@ -10,7 +10,7 @@ bind pub - !idle kwhois:nick
 bind pub - idle kwhois:nick
 bind pub - .version kversion:nick
 bind pub - !version kversion:nick
-#bind pub - .ver kversion:nick
+bind pub - .ver kversion:nick
 bind pub - version kversion:nick
 
 proc kwhois:nick {nickname hostname handle channel arguments} {
@@ -153,4 +153,4 @@ proc cekmovers {moverscek chan} {
       set movers "off"
    }
 }
-putlog "idleversion    write_ by KocHi (uKi`/akai) -: LoadeD :-"
+putlog "idleversion    write_ by chatingID -: LoadeD :-"
