@@ -135,4 +135,4 @@ proc dcc_dnslookup {hand idx text} {
 	return 0
 }
 
-putlog "HOST 1.1 (ported to eggdrop 1.3.x) by Samurai_G <buddha@ih8dos.com> loaded."
+putlog "HOST 1.1 (ported to eggdrop 1.3.x) by Lemon <yuslemon91@gmail.com> loaded."
