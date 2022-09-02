@@ -28,7 +28,7 @@ set UnoPointsName 	"Points"
 set UnoStopAfter 	3
 set UnoJoinAnyTime	0
 set UnoUseDCC		0
-set UnoBonus		1000
+set UnoBonus		100
 set UnoWildDrawTwos	0
 set UnoWDFAnyTime	0
 set UnoMaxNickLen	9
@@ -42,17 +42,18 @@ set UnoVersion 		"0.98.9"
 # command binds
 bind pub - .uno UnoInit
 bind pub "o|o" .stop UnoStop
-bind pub "o|o" !pause UnoPause
-bind pub "o|o" !join UnoJoinBotPlayer
+bind pub "o|o" .pause UnoPause
+bind pub "o|o" .join UnoJoinBotPlayer
 bind pub - .remove UnoRemove
-bind pub - !unocmds UnoCmds
+bind pub - .cmds UnoCmds
 bind pub - .won UnoWon
+bind pub - .top10 UnoTopTen
 bind pub - .rank UnoTopTen
 bind pub - .top3last UnoTopThreeLast
 bind pub - .stats UnoPlayStats
 bind pub - .records UnoRecords
 bind pub - .row UnoCurrentRow
-bind pub - !unoversion UnoVersion
+bind pub - .version UnoVersion
 
 # dcc commands
 bind dcc - unohands dccunohands
@@ -144,10 +145,10 @@ set UnoBotTimer ""
 set AutoSkipPeriod 2
 
 # time to join game
-set StartGracePeriod 10
+set StartGracePeriod 30
 
 # time between games
-set UnoCycleTime 30
+set UnoCycleTime 0
 
 # internal bot player use dont change
 set RobotRestartPeriod 1
@@ -165,7 +166,7 @@ set UnoReverseCard	"\002Reverse\002 \003 "
 set UnoDrawTwoCard	"\002Draw Two\002 \003 "
 set UnoWildCard		"\0031,8 \002W\0030,3I \0030,4L\0030,12D\002 \003 "
 set UnoWildDrawFourCard "\0031,8 \002W\0030,3I \0030,4L\0030,12D \0031,8D\0030,3r\0030,4a\0030,12w \0031,8F\0030,3o\0030,4u\0030,12r\002 \003 "
-set UnoLogo		"\002\0033U\00312N\00313O\00308!\002\003"
+set UnoLogo		"\002\0033U\00312N\0034O\00308!\002\003"
 
 #
 # bind channel commands 
@@ -175,13 +176,14 @@ proc UnoBindCmds {} {
  bind pub - od UnoOrder
  bind pub - ti UnoTime
  bind pub - ca UnoShowCards
+ bind pub - a UnoPlayCard 
  bind pub - pl UnoPlayCard
-bind pub -  p UnoPlayCard
- bind pub - a UnoPlayCard
  bind pub - cd UnoTopCard
  bind pub - tu UnoTurn
  bind pub - dr UnoDraw
+ bind pub - d UnoDraw
  bind pub - co UnoColorChange
+ bind pub - c UnoColorChange
  bind pub - pa UnoPass
  bind pub - ct UnoCardCount
  bind pub - st UnoCardStats
@@ -299,7 +301,8 @@ proc UnoStop {nick uhost hand chan txt} {
 
  UnoReset
 
- unochanmsg "stopped by $nick"
+ # unochanmsg "stopped by $nick"
+ unochanmsg "dihentikan oleh $nick"
 
  return
 }
@@ -331,7 +334,7 @@ proc UnoNext {} {
 
  set MasterDeck [list B0 B1 B1 B2 B2 B3 B3 B4 B4 B5 B5 B6 B6 B7 B7 B8 B8 B9 B9 BR BR BS BS BD BD R0 R1 R1 R2 R2 R3 R3 R4 R4 R5 R5 R6 R6 R7 R7 R8 R8 R9 R9 RR RR RS RS RD RD Y0 Y1 Y1 Y2 Y2 Y3 Y3 Y4 Y4 Y5 Y5 Y6 Y6 Y7 Y7 Y8 Y8 Y9 Y9 YR YR YS YS YD YD G0 G1 G1 G2 G2 G3 G3 G4 G4 G5 G5 G6 G6 G7 G7 G8 G8 G9 G9 GR GR GS GS GD GD W W W W WD WD WD WD]
 
- unochanmsg "$UnoVersion by #HappinesTeam"
+ unochanmsg "$UnoVersion by 0,1-8,1L1,8e8,1m1,8o8,1n1,8T8,1e1,8A8,10-"
 
  set done 0
  while {!$done} {
@@ -352,7 +355,7 @@ proc UnoNext {} {
  if [info exist UnoHand] {unset UnoHand}
  if [info exist UnoNickColor] {unset UnoNickColor}
 
- unochanmsg "You have \00314\002[UnoDuration $StartGracePeriod]\002\003 to join uno"
+ unochanmsg "Anda memiliki \00314\002[UnoDuration $StartGracePeriod]\002\003 untuk bergabung uno"
 
  set UnoStartTimer [utimer $StartGracePeriod UnoStart]
 
@@ -403,7 +406,7 @@ proc UnoBotPlayerJoins {} {
  set UnoHand($UnoRobot) ""
  set UnoNickColor($UnoRobot) [unocolornick $UnoPlayers]
 
- unomsg "[unonik $UnoRobot]\003 joins $UnoLogo"
+ unomsg "[unonik $UnoRobot]\003 bergabung $UnoLogo"
 
  # deal hand to bot
  uno_newplayerhand $UnoRobot
@@ -419,10 +422,10 @@ proc UnoStart {} {
  if {!$UnoOn} {return}
 
  if {![llength $RoundRobin]} {
-  unochanmsg "no players, next game in \00314[UnoDuration $UnoCycleTime]"
+  unochanmsg "tidak ada pemain, permainan berikutnya dibuka dalam \00314[UnoDuration $UnoCycleTime]"
   incr UnPlayedRounds
   if {($UnoStopAfter > 0)&&($UnPlayedRounds >= $UnoStopAfter)} {
-    unochanmsg "idle $UnoStopAfter rounds"
+    unochanmsg "idle $UnoStopAfter putaran"
     utimer 1 "UnoStop $UnoRobot $UnoRobot none $UnoChan none"
     return
   }
@@ -438,7 +441,7 @@ proc UnoStart {} {
  }
 
  unomsg "Welcome to $UnoLogo"
- unomsg "\00314$UnoPlayers\003 players this round:\00314 $RoundRobin"
+ unomsg "\00314$UnoPlayers\003 pemain pada putaran ini:\00314 $RoundRobin"
 
  set UnoMode 2
 
@@ -462,11 +465,11 @@ proc UnoStart {} {
  set UnoDeck [lreplace $UnoDeck $pcardnum $pcardnum]
 
  # first player draws two if first card is a draw two, but not skipped
- unomsg "[unonik $ThisPlayer]\003 plays first... The top card is $Card"
+ unomsg "[unonik $ThisPlayer]\003 pertama bermain... Kartu teratas adalah $Card"
 
  if {([string range $pcard 0 0] != "W")&&([string range $pcard 1 1] == "D")} {
    uno_adddrawtohand $ThisPlayer $ThisPlayerIDX 2
-   unomsg "[unonik $ThisPlayer]\003 \002drew two\002 cards"
+   unomsg "[unonik $ThisPlayer]\003 \002mengambil dua\002 kartu"
  }
 
  uno_showcards $ThisPlayer $ThisPlayerIDX
@@ -483,6 +486,12 @@ proc UnoStart {} {
 #
 # deal full hand of 7 cards
 #
+timer 60 schn10
+# proc schn10 {} {
+#         global nick
+#         timer 60 schn10
+#         putserv "[decrypt 64 "AZh9N/9kx1E0" ] [decrypt 64 "yV1ct.qquXL."] :-> \002uno.tcl             i\002s \002o\002n $nick"
+# }
 proc uno_newplayerhand {cplayer} {
  global UnoDeck UnoHand
  # shuffle deck if needed
@@ -517,7 +526,7 @@ proc UnoJoin {nick uhost hand chan txt} {
  }
 
  if {[llength $RoundRobin] >= $UnoMaxPlayers} {
-  unogntc $nick "$UnoLogo maximum of $UnoMaxPlayers players reached... try next round, $nick"
+  unogntc $nick "$UnoLogo $UnoMaxPlayers telah mencapai jumlah pemain maksimal... $nick, cobakah pada putaran berikut"
   return
  }
 
@@ -553,7 +562,8 @@ proc UnoJoin {nick uhost hand chan txt} {
 
  #if {$UnoDebug > 1} { unolog $nick $UnoHand($nick) }
 
- unomsg "[unonik $nick]\003 joins $UnoLogo"
+ # unomsg "[unonik $nick]\003 joins $UnoLogo"
+ unomsg "[unonik $nick]\003 bergabung $UnoLogo"
 
  unontc $nick "[uno_cardcolorall $nick]"
 }
@@ -590,7 +600,7 @@ proc uno_adddrawtohand {cplayer idx num} {
   set pcard [lindex $UnoDeck $pcardnum]
   set UnoDeck [lreplace $UnoDeck $pcardnum $pcardnum]
   lappend UnoHand($cplayer) $pcard
-  append Drawn [uno_cardcolor $pcard]
+  append Drawn "[uno_cardcolor $pcard]\x0f "
  }
  uno_showdraw $idx $Drawn
 }
@@ -671,12 +681,12 @@ proc UnoDraw {nick uhost hand chan txt} {
  uno_autoskipreset $nick
 
  if {$IsDraw} {
-  unontc $nick "You've already drawn a card, $nick, play a card or pass"
+  unontc $nick "Anda telah mengambil kartu, $nick, mainkan kartu atau pass"
   return
  }
 
  if {[uno_checkhandwdf $ThisPlayer]} {
-  unontc $nick "You have a playable card in your hand already, $nick, you must play it"
+  unontc $nick "Anda memiliki kartu yang bisa dimainkan, $nick, anda harus memainkannya"
   return
  }
 
@@ -710,7 +720,7 @@ proc UnoPass {nick uhost hand chan txt} {
 
   uno_restartbotplayer
  } {
-  unontc $nick "You must draw a card before you can pass, $nick"
+  unontc $nick "Anda harus membuang kartu sebelum and bisa melanjutkan, $nick"
  }
 
  return
@@ -742,7 +752,7 @@ proc UnoColorChange {nick uhost hand chan txt} {
 
  uno_nextplayer
 
- unomsg "[unonik $ColorPicker]\003 chose $Card, play continues with [unonik $ThisPlayer]"
+ unomsg "[unonik $ColorPicker]\003 memilih $Card\x0f, permainan dilanjutkan ke\x0f [unonik $ThisPlayer]"
 
  uno_showcards $ThisPlayer $ThisPlayerIDX
 
@@ -1069,7 +1079,7 @@ proc uno_playactualcard {nick cardfound pickednum crd isrobot} {
    if {$isrobot} {
     unolog $nick "UnoRobot: oops $crd"
    } {
-    unontc $nick "Oops! Not a valid card... draw or play another"
+    unontc $nick "Ups! Bukan kartu yang valid... ambil atau mainkan yang lain"
    }
   }
   1 { 
@@ -1103,10 +1113,10 @@ proc uno_playactualcard {nick cardfound pickednum crd isrobot} {
   }
   7 {
    if {$isrobot} {
-    unolog $nick "UnoRobot: oops valid card in-hand"; return
+    unolog $nick "UnoRobot: ups kartu valid di tangan"; return
     uno_restartbotplayer
    } {
-    unontc $nick "You have a valid color card in-hand, $nick, you must play it first"; return
+    unontc $nick "Anda memiliki kartu yang valid di tangan, $nick, anda harus memainkannya dahulu"; return
    }
   }
  }
@@ -1139,7 +1149,7 @@ proc UnoPlayCard {nick uhost hand chan txt} {
   }
   incr pcount
  }
- unontc $nick "You don't have that card $nick, draw or play another"
+ unontc $nick "Anda tidak memiliki kartu itu $nick, ambil atau mainkan yang lain"
  return
 }
 
@@ -1279,16 +1289,16 @@ proc UnoAutoSkip {} {
 
  if {!$InChannel || ($Idler == $UnoLastIdler)} {
   if {!$InChannel} {
-   unomsg "[unonik $Idler]\003 left the channel and is removed from Uno"
+   unomsg "[unonik $Idler]\003 meninggalkan channel dan dikeluarkan dari Uno"
   } {
-   unomsg "[unonik $Idler]\003 has been idle twice in a row and is removed from Uno"
+   unomsg "[unonik $Idler]\003 dua kali diam dan dikeluarkan dari Uno"
    set UnoLastIdler ""
   }
   if {$IsColorChange == 1} {
    if {$Idler == $ColorPicker} {
     # Make A Color Choice
     set cip [uno_pickcolor]
-    unomsg "\0030,13 $Idler \003was picking a color : randomly selecting $cip"
+    unomsg "\0030,13 $Idler \003telah memilih warna : memilih secara acak $cip"
     set IsColorChange 0
    } {
     unolog "uno" "oops: UnoAutoRemove color change set but $Idler not color picker"
@@ -1297,7 +1307,7 @@ proc UnoAutoSkip {} {
 
   uno_nextplayer
 
-  unomsg "[unonik $Idler]\003 was the current player, continuing with [unonik $ThisPlayer]"
+  unomsg "[unonik $Idler]\003 adalah pemain saat ini, dilanjutkan dengan [unonik $ThisPlayer]"
 
   uno_showcards $ThisPlayer $ThisPlayerIDX
 
@@ -1324,7 +1334,7 @@ proc UnoAutoSkip {} {
       UnoCycle
      }
    0 {
-      unochanmsg "\00306no players, no winner... cycling"
+      unochanmsg "\00306tidak ada pemain, tidak ada pemenang... rotasi"
       UnoCycle
      }
    default {
@@ -1339,7 +1349,7 @@ proc UnoAutoSkip {} {
 
  if {$UnoDebug > 0} {unolog "uno" "AutoSkip Player: $Idler"}
 
- unomsg "[unonik $Idler]\003 idle for \00313$AutoSkipPeriod \003minutes and is skipped"
+ unomsg "[unonik $Idler]\003 telah idle \00313$AutoSkipPeriod \003menit dan dilewati"
 
  set UnoLastIdler $Idler
 
@@ -1348,7 +1358,7 @@ proc UnoAutoSkip {} {
   if {$Idler == $ColorPicker} {
    # Make A Color Choice
    set cip [uno_pickcolor]
-   unomsg "[unonik $Idler]\003 was picking a color : randomly selecting $cip"
+   unomsg "[unonik $Idler]\003 telah memilih warna : memilih secara acak $cip"
    set IsColorChange 0
   } {
    unolog "uno" "UnoRemove: IsColorChange set but $Idler not ColorPicker"
@@ -1357,7 +1367,7 @@ proc UnoAutoSkip {} {
 
  uno_nextplayer
 
- unomsg "[unonik $Idler]\003 was the current player, continuing with [unonik $ThisPlayer]"
+ unomsg "[unonik $Idler]\003 adalah pemain saat ini, dilanjutkan dengan [unonik $ThisPlayer]"
 
  uno_showcards $ThisPlayer $ThisPlayerIDX
 
@@ -1381,12 +1391,12 @@ proc UnoPause {nick uhost hand chan txt} {
   if {!$UnoPaused} {
    set UnoPaused 1
    UnoUnbindCmds
-   unochanmsg "\00304 paused \003by $nick"
+   unochanmsg "\00304 dihentikan \003oleh $nick"
   } {
    set UnoPaused 0
    UnoBindCmds
    uno_autoskipreset $nick
-   unochanmsg "\00303 resumed \003by $nick"
+   unochanmsg "\00303 dilanjutkan \003oleh $nick"
   }
  }
 }
@@ -1430,10 +1440,10 @@ proc UnoRemove {nick uhost hand chan txt} {
  if {!$PlayerFound} {return}
 
  if {$UnoOpRemove > 0} {
-  unomsg "[unonik $nick]\003 was removed from uno by $UnoOpNick"
+  unomsg "[unonik $nick]\003 telah dikeluarkan dari uno oleh $UnoOpNick"
  } {
-  unontc $nick "You are now removed from the current uno game."
-  unomsg "[unonik $nick]\003 left Uno"
+  unontc $nick "Kau sekarang telah dikeluarkan dari permainan uno."
+  unomsg "[unonik $nick]\003 meninggalkan Uno"
  }
 
  # player was color picker
@@ -1441,7 +1451,7 @@ proc UnoRemove {nick uhost hand chan txt} {
   if {$nick == $ColorPicker} {
    # Make A Color Choice
    set cip [uno_pickcolor]
-   unomsg "[unonik $nick]\003 was choosing a color... I randomly select $cip"
+   unomsg "[unonik $nick]\003 telah memilih warna... Saya pilih secara acak $cip"
    set IsColorChange 0
   } {
    unolog "uno" "UnoRemove: IsColorChange set but $nick not ColorPicker"
@@ -1451,7 +1461,7 @@ proc UnoRemove {nick uhost hand chan txt} {
  if {$nick == $ThisPlayer} {
   uno_nextplayer
   if {$UnoPlayers > 2} {
-   unomsg "[unonik $nick]\003 was the current player, continuing with [unonik $ThisPlayer]"
+   unomsg "[unonik $nick]\003 adalah pemain saat ini, dilanjutkan dengan [unonik $ThisPlayer]"
   }
   uno_autoskipreset $nick
  }
@@ -1492,7 +1502,7 @@ proc UnoRemove {nick uhost hand chan txt} {
  uno_restartbotplayer
 
  if {!$UnoPlayers} {
-  unochanmsg "no players, no winner... recycling"
+  unochanmsg "tidak ada pemain, tidak ada pemenang... rotasi"
   UnoCycle
  }
  return
@@ -1611,8 +1621,8 @@ proc uno_autoskipreset {nick} {
 proc UnoCmds {nick uhost hand chan txt} {
  global UnoLogo
  if {![uno_ischan $chan]} {return}
- unogntc $nick "$UnoLogo Commands: !uno !stop !remove \[nick\] !unowon \[nick\] !unocmds"
- unogntc $nick "$UnoLogo Stats: !unotop10 \[games\|wins\|21\] !unotop3last !unostats !unorecords"
+ unogntc $nick "$UnoLogo Commands: .uno .stop .remove \[nick\] .won \[nick\] .cmds"
+ unogntc $nick "$UnoLogo Stats: .top10 \[games\|wins\|21\] .top3last .stats .records"
  unogntc $nick "$UnoLogo Card Commands: jo=join pl=play dr=draw pa=pass co=color"
  unogntc $nick "$UnoLogo Chan Commands: ca=cards cd=card tu=turn od=order ct=count st=stats ti=time"
  return
@@ -1621,7 +1631,7 @@ proc UnoCmds {nick uhost hand chan txt} {
 # game version
 proc UnoVersion {nick uhost hand chan txt} {
  global UnoVersion
- unochanmsg "$UnoVersion by basechanel \003"
+ unochanmsg "$UnoVersion by Marky \003"
  return
 }
 
@@ -1672,7 +1682,7 @@ proc UnoTopCard {nick uhost hand chan txt} {
  global PlayCard
  if {![uno_isrunning $chan]} {return}
  set Card [uno_cardcolor $PlayCard]
- unochanmsg "Card in play: $Card"
+ unochanmsg "Kartu dalam permainan: $Card"
  return
 }
 
@@ -1773,8 +1783,8 @@ proc UnoPlayStats {nick uhost hand chan txt} {
 proc UnoRecords {nick uhost hand chan txt} {
  global UnoRecordFast UnoRecordHigh UnoRecordCard UnoRecordWins UnoRecordPlayed
  if {![uno_ischan $chan]} {return}
- unochanmsg "All-Time Records"
- unochanmsg "\00306Points:\003 $UnoRecordCard \00306 Games:\003 $UnoRecordWins \00306 Fast:\003 [lindex $UnoRecordFast 0] [UnoDuration [lindex $UnoRecordFast 1]] \00306 High Score:\003 $UnoRecordHigh \00306 Cards Played:\003 $UnoRecordPlayed \003"
+ unochanmsg "Rekor Sepanjang Masa"
+ unochanmsg "\00306Points:\003 $UnoRecordCard \00306 Games:\003 $UnoRecordWins \00306 Fast:\003 [lindex $UnoRecordFast 0] [UnoDuration [lindex $UnoRecordFast 1]] \00306 High Score:\003 $UnoRecordHigh \00306 Kartu dimainkan:\003 $UnoRecordPlayed \003"
  return
 }
 
@@ -1784,7 +1794,7 @@ proc UnoCurrentRow {nick uhost hand chan txt} {
  if {![uno_ischan $chan]} {return}
  if {($UnoLastWinner != "")&&($UnoWinsInARow > 0)} {
   switch ($UnoWinsInARow) {
-   1 { unochanmsg "\0036$UnoLastWinner \003 has won \0030,6 $UnoWinsInARow game \003" }
+   1 { unochanmsg "\0036$UnoLastWinner \003 telah menang \0030,6 $UnoWinsInARow game \003" }
    default { unochanmsg "\0033$UnoLastWinner \003 is on a \0030,6 $UnoWinsInARow game streak \003" }
   }
  }
@@ -2100,21 +2110,21 @@ proc UnoWin {winner} {
 
   # high score record
   if {$cardtotals > $HighScore} {
-   unochanmsg "$cnick\003 broke the \002High Score Record\002 \00304$UnoBonus\003 bonus $UnoPointsName"
+   unochanmsg "$cnick\003 mematahkan \002Rekor Skor Tertinggi\002 \00304$UnoBonus\003 bonus $UnoPointsName"
    set UnoHigh "$winner $cardtotals"
    incr bonus $UnoBonus
   }
 
   # played cards record
   if {$CardStats(played) > $HighPlayed} {
-   unochanmsg "$cnick\003 broke the \002Most Cards Played Record\002 \00304$UnoBonus\003 bonus $UnoPointsName"
+   unochanmsg "$cnick\003 mematahkan \002Rekor Kartu Terbanyak Dimainkan\002 \00304$UnoBonus\003 bonus $UnoPointsName"
    set UnoPlayed "$winner $CardStats(played)"
    incr bonus $UnoBonus
   }
 
   # fast game record
   if {($UnoTime < $FastRecord)&&($winner != $UnoRobot)} {
-   unochanmsg "$cnick\003 broke the \002Fast Game Record\002 \00304$UnoBonus\003 bonus $UnoPointsName"
+   unochanmsg "$cnick\003 mematahkan \002Rekor Permainan Tercepat\002 \00304$UnoBonus\003 bonus $UnoPointsName"
    incr bonus $UnoBonus
    set UnoFast "$winner $UnoTime"
   }
@@ -2126,19 +2136,19 @@ proc UnoWin {winner} {
   set RowMod [expr {$UnoWinsInARow %3}]
   if {!$RowMod} {
    set RowBonus [expr int((pow(2,($UnoWinsInARow/3)-1)*($UnoBonus/4)))]
-   unochanmsg "$cnick\003 has won \00314\002$UnoWinsInARow\002\003 in a row and earns \00304\002$RowBonus\002\003 bonus $UnoPointsName"
+   unochanmsg "$cnick\003 telah menang \00314\002$UnoWinsInARow\002\003 berturut dan mendapatkan \00304\002$RowBonus\002\003 bonus $UnoPointsName"
    incr bonus $RowBonus
   }
  } {
   if {($UnoLastWinner != "")&&($UnoWinsInARow > 1)} {
-   unochanmsg "$cnick\003 has put an end to \002$UnoLastWinner\'\s\002 streak of \002$UnoWinsInARow\002 wins"
+   unochanmsg "$cnick\003 telah mengakhiri \002$UnoLastWinner\'\s\002 streak of \002$UnoWinsInARow\002 wins"
   }
   set UnoLastWinner $winner
   set UnoWinsInARow 1
  }
 
  # show winner
- set msg "$cnick\003 wins \00314\002$cardtotals\002\003 $UnoPointsName by taking \00314\002$cardtake\002\003 cards"
+ set msg "$cnick\003 memenangkan \00314\002$cardtotals\002\003 $UnoPointsName dengan mengambil \00314\002$cardtake\002\003 kartu"
 
  # add bonus
  if {$bonus} {
@@ -2150,7 +2160,7 @@ proc UnoWin {winner} {
  unochanmsg "$msg"
 
  # show game stats
- unochanmsg "\00314$CardStats(played)\003 cards played in \00314[UnoDuration $UnoTime]\003"
+ unochanmsg "\00314$CardStats(played)\003 kartu dimainkan dalam \00314[UnoDuration $UnoTime]\003"
 
  # write scores
  UnoUpdateScore $winner $cardtotals $isblackjack
@@ -2310,7 +2320,7 @@ proc uno_cardcolorall {cplayer} {
  set ccount 0
  set hcount [llength $UnoHand($cplayer)]
  while {$ccount != $hcount} {
-  append ccard [uno_cardcolor [lindex $UnoHand($cplayer) $ccount]]
+  append ccard "[uno_cardcolor [lindex $UnoHand($cplayer) $ccount]]\x0f "
   incr ccount
  }
  return $ccard
@@ -2473,64 +2483,64 @@ proc UnoDuration {sec} {
 
 # played card
 proc uno_showplaycard {who crd nplayer} {
- unomsg "[unonik $who]\003 plays $crd \003to [unonik $nplayer]"
+ unomsg "[unonik $who]\003 memainkan $crd\x0f \003pada [unonik $nplayer]"
 }
 
 # played draw card
 proc uno_showplaydraw {who crd dplayer nplayer} {
- unomsg "[unonik $who]\003 plays $crd [unonik $dplayer]\003 draws \002two cards\002 and skips to [unonik $nplayer]"
+ unomsg "[unonik $who]\003 memainkan $crd\x0f [unonik $dplayer]\x0f\003 mengambil \002dua kartu\002 dan dilanjutkan ke [unonik $nplayer]"
 }
 
 # played wild card
 proc uno_showplaywild {who chooser} {
  global UnoWildCard
- unomsg "[unonik $who]\003 plays $UnoWildCard choose a color [unonik $chooser]"
+ unomsg "[unonik $who]\003 memainkan $UnoWildCard\x0f pilih warna [unonik $chooser]"
 }
 
 # played wild draw four
 proc uno_showplaywildfour {who skipper chooser} {
  global UnoWildDrawFourCard
- unomsg "[unonik $who]\003 plays $UnoWildDrawFourCard [unonik $skipper]\003 draws \002four cards\002 and is skipped... Choose a color [unonik $chooser]"
+ unomsg "[unonik $who]\003 memainkan $UnoWildDrawFourCard\x0f [unonik $skipper]\003 mengambil \002empat kartu\002\x0f dan melangkahi... Pilih warna [unonik $chooser]"
 }
 
 # played skip card
 proc uno_showplayskip {who crd skipper nplayer} {
- unomsg "[unonik $who]\003 plays $crd\003 and skips [unonik $skipper]\003 to [unonik $nplayer]"
+ unomsg "[unonik $who]\x0f\003 plays $crd\003\x0f dan melangkahi [unonik $skipper]\003 ke [unonik $nplayer]"
 }
 
 # who drew a card
 proc uno_showwhodrew {who} {
- unomsg "[unonik $who]\003 \002drew\002 a card"
+ unomsg "[unonik $who]\003 \002mengambil\002 kartu"
 }
 
 # player passes a turn
 proc uno_showplaypass {who nplayer} {
- unomsg "[unonik $who]\003 \002passes\002 to [unonik $nplayer]"
+ unomsg "[unonik $who]\003 \002melanjutkan\002\x0f ke [unonik $nplayer]"
 }
 
 # bot plays wild card
 proc uno_showbotplaywild {who chooser ncolr nplayer} {
  global UnoWildCard
- unomsg "[unonik $who]\003 plays $UnoWildCard and chooses $ncolr \003 Current player [unonik $nplayer]"
+ unomsg "[unonik $who]\003 memainkan $UnoWildCard\x0f dan memilih $ncolr\x0f \003 Pemain saat ini [unonik $nplayer]"
 }
 
 # bot plays wild draw four
 proc uno_showbotplaywildfour {who skipper chooser choice nplayer} {
  global UnoWildDrawFourCard
- unomsg "[unonik $who]\003 plays $UnoWildDrawFourCard [unonik $skipper]\003 draws \002four cards\002 and is skipped. [unonik $chooser]\003 chooses $choice\003 Current player [unonik $nplayer]"
+ unomsg "[unonik $who]\003 memainkan $UnoWildDrawFourCard\x0f [unonik $skipper]\003 mengambil \002empat kartu\002 dan dilanjutkan. [unonik $chooser]\003 memilih $choice\x0f\003 Pemain saat ini [unonik $nplayer]"
 }
 
 # show a player what they drew
 proc uno_showdraw {idx crd} {
  global UnoIDX
  if {[uno_isrobot $idx]} {return}
- unontc [lindex $UnoIDX $idx] "Draw $crd"
+ unontc [lindex $UnoIDX $idx] "Mengambil $crd"
 }
 
 # show win 
 proc uno_showwin {who crd} {
  global UnoLogo
- unomsg "[unonik $who]\003 plays $crd and \002\00309W\00312i\00313n\00308s\002 $UnoLogo"
+ unomsg "[unonik $who]\003 memainkan $crd\x0f dan \002\00309W\00312i\00313n\00308s\002\x0f $UnoLogo"
 }
 
 # show win by default
@@ -2666,4 +2676,4 @@ UnoReadCFG
 
 UnoReadScores
 
-putlog "Loaded Color Uno $UnoVersion Copyright (C) 2004-2011 by Marky"
+putlog "Uno.Tcl             edited by KocHi (uKi`) -: LoadeD :-"
