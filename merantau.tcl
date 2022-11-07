@@ -22,10 +22,10 @@ proc vrandom {} {
   return [lindex "02 03 04 05 06 07 08 09 10 11 12 13" [rand 12]]
 }
 proc semx_notc {} {
-  return "07Kh[vrandom]u04z"
+  return "07yo[vrandom]s04e"
 }
 proc semx_vern {} {
-  return "09K06h07u[vrandom]18z"
+  return "09y06o07s[vrandom]18e"
 }
 set ctcp-version [semx_vern]
 set semx_tdkknl {
@@ -53,13 +53,13 @@ set semx_tdkknl {
 set cyclem {
   "%warna%Out of My Head"
   "%warna%aku Kereeeennnnnnnn"
-  "%warna%!seen deyese"
-  "%warna%sEm is my owner"
+  "%warna%!seen Lemon"
+  "%warna%yose is my owner"
   "%warna%Need Cycle"
   "%warna%RehasHing"
   "%warna%ktg IRC Team"
-  "%warna%yobyata Community" 
-  "%warna%Just For Yobayat"
+  "%warna%yobayat Community" 
+  "%warna%Just For yobayat"
   "%warna%Since 2007"
 }
 set awaym {
