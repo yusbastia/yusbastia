@@ -552,10 +552,10 @@ if {$status != "ok"} {
 ###
 proc corona:vaccine {country} {
 	global corona
-if {[string equal -nocase $country "USA"]} {
-	set country "United States"
-} elseif {[string equal -nocase $country "UK"]} {
-	set country "United Kingdom"
+if {[string equal -nocase $country "Indonesia"]} {
+	set country "Indonesia"
+} elseif {[string equal -nocase $country "ID"]} {
+	set country "Indonesia"
 }
 	set country [join $country "%20"]
 	http::register https 443 [list ::tls::socket -autoservername true]
