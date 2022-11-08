@@ -22,16 +22,16 @@ proc lag_reply {nick uhost hand dest key arg} {
     set endd [unixtime]
     set lagg [expr $endd - $arg]
     if {$lagg > "30"} {
-      putserv "NOTICE $nick :Geez!  You are horribly lagged!! Yer $lagg seconds behind the rest of us!  :(  Switch servers QUICK!"
+      putserv "PRIVMSG $nick :Geez!  You are horribly lagged!! Yer $lagg seconds behind the rest of us!  :(  Switch servers QUICK!"
       putlog "$nick is lagged by $lagg secs"
       return 1
     }
     if {$lagg > "15"} {
-      putserv "NOTICE $nick :You are quite lagged!! Your ping time is $lagg secs! :("
+      putserv "PRIVMSG $nick :You are quite lagged!! Your ping time is $lagg secs! :("
       putlog "$nick is lagged by $lagg secs"
       return 1
     }
-    putserv "NOTICE $nick :You are lagged by $lagg secs!  Not too bad! :)"
+    putserv "PRIVMSG $nick :You are lagged by $lagg secs!  Not too bad! :)"
     putlog "$nick is lagged by $lagg secs"
   }
 }
