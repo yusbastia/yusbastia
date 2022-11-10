@@ -1,10 +1,3 @@
-
-########################################################
-## Earthquake Announcer  v1.4 by SpiKe^^   28/09/2018 ##
-##   => All original script credits to speechles <=   ##
-##   http://forum.egghelp.org/viewtopic.php?t=20350   ##
-########################################################
-
 # Earthquake .. rumble rumble rumble
 
 # This script will announce earthquakes just like an rss script
@@ -14,42 +7,11 @@
 
 # speechles was here :P
 
-
-################################################################
-##                                                            ##
-## -> NEW IN VERSION 1.4 <-                                   ##
-##  -Fixes an old error I was recently able to recreate here: ##
-##   Tcl error [::eqnews::magic_]: can't read                 ##
-##    "::eqnews::ary(events)": no such element in array       ##
-##                                                            ##
-################################################################
-## VERSION 1.3  -  11/09/2018                                 ##
-##  -Fixes the recent tls error:                              ##
-##   Error flushing "sock2322280": connection reset by peer...##
-################################################################
-## VERSION 1.2  -  08/10/2017                                 ##
-##  -New page address & parsing regex (thanks thommey)        ##
-##  -Now supports ssl page address (new page is https)        ##
-################################################################
-
-
-################################################################
-## Enable script per #channel, in partyline, use:             ##
-##  .chanset #channel +earthquake                             ##
-##                                                            ##
-## Public and PrivateMessage commands:                        ##
-##  !eq     :Say the 5 most recent earthquake events          ##
-##  !eq 4+  :Say the last 5 events M4.0 or larger             ##
-################################################################
-## New feed reader code:                                      ##
-##   no longer misses events posted out-of-order!             ##
-################################################################
-
 package require http
-package require tls
+package require tls  ;# added: plat_ #
 setudef flag earthquake
 
-namespace eval eqnews {
+namespace eval news {
    # config - make your changes here
    # trigger character
    set ary(pref) "!"
@@ -71,13 +33,10 @@ namespace eval eqnews {
    # set ary(bind_time) "00* 30*" ; # every 30 minutes
    set ary(bind_time) "?0* ?5*" ; # every 5 minutes
 
-   # url to news page  (all available feeds)
-   #set ary(page) https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_day.atom ; # only significant
-   #set ary(page) https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.atom ; # 4.5 and greater only
-   #set ary(page) https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.atom ; # 2.5 and greater only
-   #set ary(page) https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/1.0_day.atom ; # 1.0 and greater only
-   #set ary(page) https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.atom ; # all
-   set ary(page) https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.atom
+   # url to news page
+   set ary(page) https://earthquake.usgs.gov/earthquakes/feed/atom/2.5/day ; # 2.5 and greater only
+   #set ary(page) https://earthquake.usgs.gov/earthquakes/feed/atom/1.0/day ; # 1.0 and greater only
+   #set ary(page) https://earthquake.usgs.gov/earthquakes/feed/atom/all/day ; # all
 
    # minimum magnitude to show of quakes
    # everything equal to or above this magnitude
@@ -85,13 +44,12 @@ namespace eval eqnews {
    # this should be larger than what is used in ary(page)
    set ary(magnitude) 4
 
-   # max age (in minutes) of earthquakes to show
-   # this only affects the automation...
-   # this should be 120 minutes or more  (def: 300)
-   set ary(old) 300
-
    # parsing regex used to gather news
-   set ary(regex) {<entry>.*?<title>(.*?)</title><updated>(.*?)</updated>.*?href="https://earthquake.usgs.gov/earthquakes/eventpage/(.*?)".*?<dt>Time</dt><dd>(.*?)</dd>}
+   #set ary(regex) {(.*?),(.*?),.*?"(.*?)",.*?,.*?,(.*?),.*?"(.*?)"}
+   set ary(regex) {<entry>.*?<title>(.*?)</title><dc:date>(.*?)</dc:date>.*?href="https://earthquake.usgs.gov/earthquakes/eventpage/(.*?)"/>}
+
+   # how to snip last-id from the url mask
+   set ary(snip_lastid) {}
 
    # max amount of news items to announce
    set ary(max_bot) 5
@@ -99,147 +57,107 @@ namespace eval eqnews {
    # max amount of news items for users
    set ary(max_user) 5
 
-   # display format for news messages, variables are: %mag, %title, %ago, %event 
+   # display format for news messages, variables are: %description, %title, %url
    # these can be used and will be replaced with actual values, newline (\n) will
    # let you span multiple lines if you wish. If something is too long it will
    # be cut off, be aware of this... use colors, bold, but remember to \escape any
-   # special tcl characters. 
-   set ary(display_format) "\002USGS Earthquake\002: M\002%mag\002, %title (%ago ago) >> https://earthquake.usgs.gov/earthquakes/eventpage/%event"
+   # special tcl characters.
+   set ary(display_format) "\002USGS Earthquake\002: M\002%magnitude\002, %title ( %ago ago ) >> https://earthquake.usgs.gov/earthquakes/eventpage/%event"
+
+   # script version
+   set ary(version) "1.1+"
 }
 
 # binds
-foreach bind [split $::eqnews::ary(commands)] {
-   bind pub -|- "$::eqnews::ary(pref)$bind" ::eqnews::pub_
-   bind msg -|- "$::eqnews::ary(pref)$bind" ::eqnews::msg_
+foreach bind [split $::news::ary(commands)] {
+   bind pub -|- "$::news::ary(pref)$bind" ::news::pub_
+   bind msg -|- "$::news::ary(pref)$bind" ::news::msg_
 }
-foreach bind [split $::eqnews::ary(bind_time)] {
-   bind time - $bind ::eqnews::magic_
+foreach bind [split $::news::ary(bind_time)] {
+   bind time - $bind ::news::magic_
 }
-bind time - ?0* ::eqnews::throttleclean_
+bind time - ?0* ::news::throttleclean_
 
-namespace eval eqnews {
-   # script version
-   set ary(version) "1.4"
+namespace eval news {
    # main - time bind - magic
    proc magic_ {args} {
-     news_ $::botnick "-" "-" "all" "-" "privmsg"
+      news_ $::botnick [getchanhost $::botnick] $::botnick "all" "magic"
    }
+
    # main - msg bind - notice
    proc msg_ {nick uhost hand arg} {
-     news_ $nick $uhost $hand $nick $arg "notice"
+      news_ $nick $uhost $hand $nick "notice"
    }
+
    # main - pub bind - privmsg
    proc pub_ {nick uhost hand chan arg} {
-     if {[channel get $chan earthquake]} {
-       news_ $nick $uhost $hand $chan $arg "privmsg"
-     }
+      if {[channel get $chan earthquake]} {
+        news_ $nick $uhost $hand $chan "privmsg"
+      }
    }
 
-   # sub - open an ssl session
-   # see http://wiki.tcl.tk/2630 :thanks caesar
-   proc tls:socket args { 
-      set opts [lrange $args 0 end-2] 
-      set host [lindex $args end-1] 
-      set port [lindex $args end] 
-      ::tls::socket -servername $host {*}$opts $host $port 
-   } 
-
-
    # sub - give news
-   proc news_ {nick uhost hand chan arg how} {
-      if {![botonchan]} {  return  }
-      if {[isbotnick $nick]} {  set magic 1  } else {  set magic 0  }
-      if {$magic==0 && [throttle_ $uhost,$chan,news $::eqnews::ary(throttle_time)]} {
-        putserv "$how $chan :$nick, you have been Throttled! Your going too fast and making my head spin!"
-        return
+   proc news_ {nick uhost hand chan arg} {
+      if {![isbotnick $nick] && [throttle_ $uhost,$chan,news $::news::ary(throttle_time)]} {
+         putserv "$arg $chan :$nick, you have been Throttled! Your going too fast and making my head spin!"
+         return
       }
       set a "Mozilla/5.0 (Windows; U; Windows NT 5.1; ru; rv:1.9.0.1) Gecko/2008070208 Firefox/3.0.1"
       set t [::http::config -useragent $a]
 
-      #::http::register https 443 [list ::tls::socket -tls1 1]  ;# added: plat_ #
-      #::http::register https 443 ::tls::socket
-      ::http::register https 443 ::eqnews::tls:socket
+      ::http::register https 443 [list ::tls::socket -tls1 1]  ;# added: plat_ #
 
-      catch { set t [::http::geturl $::eqnews::ary(page) -timeout 30000] } error
+      catch { set t [::http::geturl $::news::ary(page) -timeout 30000] } error
       # error condition 1, socket error or other general error
-      if {![string match -nocase "::http::*" $error]} {
-        if {$magic==0} {
-          putserv "$how $chan :[string totitle [string map {"\n" " | "} $error]] \( $::eqnews::ary(page) \)"
-        }
-        return
+      if {![string match -nocase "::http::*" $error] && ![isbotnick $nick]} {
+         putserv "$arg $chan :[string totitle [string map {"\n" " | "} $error]] \( $::news::ary(page) \)"
+         return
       }
       # error condition 2, http error
-      if {![string equal -nocase [::http::status $t] "ok"]} {
-        if {$magic==0} {
-          putserv "$how $chan :[string totitle [::http::status $t]] \( $::eqnews::ary(page) \)"
-        }
-        return
+      if {![string equal -nocase [::http::status $t] "ok"] && ![isbotnick $nick]} {
+         putserv "$arg $chan :[string totitle [::http::status $t]] \( $::news::ary(page) \)"
+         return
       }
-
       set html [::http::data $t]
       ::http::cleanup $t
-
-      # new feed reader code # added: SpiKe^^ # no longer misses events posted out-of-order! #
-      set last 0 ; set events "" ; set min 0 ; set old 0
-      set now [clock seconds]
-
-      if {$magic==1} {  set max $::eqnews::ary(max_bot)
-        set min $::eqnews::ary(magnitude)
-        set old [expr {$now - ($::eqnews::ary(old) * 60)}]
-
-        if {[info exists ::eqnews::ary(last)]} {
-          set last $::eqnews::ary(last)
-        }
-        if {[info exists ::eqnews::ary(events)]} {
-          set events $::eqnews::ary(events)
-        }
-
-      } else {  set max $::eqnews::ary(max_user)
-        if {[string is double -strict [set arg [string trim $arg " +"]]]} {
-          set min $arg
-        }
+      set earthquakes [lrange [split $html "\n"] 1 end]
+      set quakes [regexp -all -inline -- "$::news::ary(regex)" $html]
+      set c 0 ; set lastid 0
+      if {[string equal "magic" $arg]} {
+        set start $::news::ary(max_bot) ; incr start -1
+      } else {
+        set start $::news::ary(max_user) ; incr start -1
       }
 
-      set c 0  ;  set first 0
+      for {set x $start} {$x >= 0} {incr x -1} {
+         set quake [lrange $quakes [expr {$x*4}] [expr {$x*4+3}]]
+         foreach {- title ago event} $quake {}
+         set magnitude [string trimright [lindex [split $title] 1] ,]
+         set title [join [lrange [split $title ,] 1 end]]
+         if {$magnitude <= $::news::ary(magnitude) && [string equal "magic" $arg]} { continue }
 
-      foreach line [lrange [split $html "\n"] 1 end] {
-
-        if {[regexp -- "$::eqnews::ary(regex)" $line x title posted event etime]} {
-          #putlog "=> ($title) ($posted) ($event) ($etime)"
-          # => (M 4.5 - 74km SSE of Phek, India) (2017-10-03T15:01:03.040Z) (us2000b0gm) (2017-10-03 13:48:34 UTC)
-          set posted [string map [list "T" " "] [lindex [split $posted .] 0]]
-          set postid [clock scan "$posted UTC"]
-          if {$first==0} {  set first $postid  }
-          set id [clock scan $etime]
-          if {$id<$old} {  break  }
-          set mag [lindex [split $title] 1]
-          if {$mag<$min || $postid<=$last || [lsearch -exact $events $event]>-1} {
-            continue
-          }
-          set etime [string trimright $etime " UTC"]
-          set title [mapit_ [string trim [join [lrange [split $title -] 1 end] -]]]
-          set dur [duration [expr {$now - $id}]]
-          if {[llength [set x [split $dur]]]>4 && [string match "sec*" [lindex $x end]]} {
-            set dur [join [lrange $x 0 end-2]]
-          }
-          set map [list "%mag" $mag "%title" $title "%ago" $dur "%event" $event]
-          set output [string map $map $::eqnews::ary(display_format)]
-          if {$magic==0} {
-            foreach line [split $output "\n"] {  puthelp "$how $chan :$line"  }
-          } else {
+         set id [clock scan "[string map [list "T" " " "Z" " "] "$ago"] GMT"] ; if {[string equal $id $lastid]} { continue }
+         if {[isbotnick $nick]} {
+            if {[info exists ::news::ary(last)]} { if {$id <= $::news::ary(last)} { continue } }
+            if {[incr c] > $::news::ary(max_bot)} { break }
+         } elseif {[incr c] > $::news::ary(max_user)} { break }
+         set output [string map [list "%magnitude" "$magnitude" "%title" "[mapit_ $title]" "%ago" "[duration [expr {[clock seconds] - $id}]]" "%event" "$event"] $::news::ary(display_format)]
+         if {![string equal "magic" $arg]} {
+            foreach line [split $output "\n"] { puthelp "$arg $chan :$line" }
+         } else {
             foreach ch [channels] {
-              if {[channel get $ch earthquake]} {
-                foreach line [split $output "\n"] { puthelp "$how $ch :$line" }
-              }
+               if {[channel get $ch earthquake]} {
+                  foreach line [split $output "\n"] { puthelp "privmsg $ch :$line" }
+               }
             }
-            lappend events $event
-          }
-          if {[incr c] == $max} {  break  }
-        }
+         }   
+         set lastid $id
       }
-
-      if {$magic==1 && $first>0} {  set ::eqnews::ary(last) $first  }
-      if {[llength $events]} {  set ::eqnews::ary(events) [lrange $events end-39 end]  }
+      if {[string equal "magic" $arg]} {
+         set last [clock scan "[string map [list "T" " " "Z" " "] "[lindex $quakes 2]"] GMT"]]
+         if {![info exists ::news::ary(last)]} { set ::news::ary(last) 0 }
+         if {$last > $::news::ary(last)} { set ::news::ary(last) $last }
+      }
    }
 
    # sub - map it
@@ -248,21 +166,21 @@ namespace eval eqnews {
    # Throttle Proc (slightly altered, super action missles) - Thanks to user
    # see this post: http://forum.egghelp.org/viewtopic.php?t=9009&start=3
    proc throttle_ {id seconds} {
-      if {[info exists ::eqnews::throttle($id)]&&[lindex $::eqnews::throttle($id) 0]>[clock seconds]} {
-         set ::eqnews::throttle($id) [list [lindex $::eqnews::throttle($id) 0] [set value [expr {[lindex $::eqnews::throttle($id) 1] +1}]]]
-         if {$value > $::eqnews::ary(throttle)} { set id 1 } { set id 0 }
+      if {[info exists ::news::throttle($id)]&&[lindex $::news::throttle($id) 0]>[clock seconds]} {
+         set ::news::throttle($id) [list [lindex $::news::throttle($id) 0] [set value [expr {[lindex $::news::throttle($id) 1] +1}]]]
+         if {$value > $::news::ary(throttle)} { set id 1 } { set id 0 }
       } {
-         set ::eqnews::throttle($id) [list [expr {[clock seconds]+$seconds}] 1]
+         set ::news::throttle($id) [list [expr {[clock seconds]+$seconds}] 1]
          set id 0
       }
    }
    # sub - clean throttled users
    proc throttleclean_ {args} {
       set now [clock seconds]
-      foreach {id time} [array get ::eqnews::throttle] {
-         if {[lindex $time 0]<=$now} {unset ::eqnews::throttle($id)}
+      foreach {id time} [array get ::news::throttle] {
+         if {[lindex $time 0]<=$now} {unset ::news::throttle($id)}
       }
    }
 }
 
-putlog "Earthquake Announcer v$::eqnews::ary(version) loaded."
+putlog "earthquake announcer.tcl v$::news::ary(version) loaded."
