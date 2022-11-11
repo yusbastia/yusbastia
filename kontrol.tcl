@@ -70,7 +70,7 @@ set cyclem {
 set awaym {
   "%warna%Powered By yuxuan"
   "%warna%Owned by yuxuan"
-  "%warna%TapaAog Chaters Community"
+  "%warna%TapaAog mIRC Community"
   "%warna%Copyright by Lemon@2016"
   "%warna%Lemon"
   "%warna%Lemon"
