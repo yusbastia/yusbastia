@@ -161,13 +161,13 @@ setudef flag idle
 setudef flag jam
 bind pub - !dns kchi_pub`dns
 bind pub - !idle kchi_pub`idle
-bind pub - .idle kchi_pub`idle
+bind pub - .i kchi_pub`idle
 bind pub - idle kchi_pub`idle
 bind pub - !whois whois:nick
 bind pub - `dns kchi_pub`dns
 bind pub - `whois whois:nick
 bind pub - whois whois:nick
-bind pub - !version kversion:nick
+bind pub - .v kversion:nick
 bind pub - .ver kversion:nick
 bind pub - !ver kversion:nick
 bind pub - version kversion:nick
