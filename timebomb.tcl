@@ -24,8 +24,8 @@
 #
 ###############################################################################
 
-bind  pub   -   timebomb  doTimebomb
-bind  pub   -   cutwire   doCutWire
+bind  pub   -   bon  doTimebomb
+bind  pub   -   cut   doCutWire
 
 ###############################################################################
 # Configuration
@@ -110,7 +110,7 @@ proc DiffuseTimebomb {wireCut} {
   killutimer $gTimerId
   set gTimerId 0
   set gTimebombActive 0
-  IRCPrivMSG $gTimebombChannel "$gTimebombTarget cut the $wireCut wire.  This has defused the bomb!"
+  IRCPrivMSG $gTimebombChannel "$gTimebombTarget telah memotong kabel $wireCut.  cie ngana selamat, bom nda jadi meledak!"
 }
 
 proc StartTimeBomb {theStarter theNick theChannel} {
@@ -119,9 +119,9 @@ proc StartTimeBomb {theStarter theNick theChannel} {
   if { $gTimebombActive == 1 } {
     note "Timebomb not started for $theStarter (Reason: timebomb already active)"
     if { $theChannel != $gTimebombChannel } {
-      IRCPrivMSG $theChannel "I don't have a single bomb to spare. :-("
+      IRCPrivMSG $theChannel "hmmp bom so nyanda ada. :-("
     } else {
-      IRCAction $theChannel "points at the bulge in the back of $gTimebombTarget's pants."
+      IRCAction $theChannel "siap pasang bom pa $gTimebombTarget bom paling berbahaya."
     }
   } else {
     set timerDuration [expr $gTimebombMinimumDuration + [expr int(rand() * ($gTimebombMaximumDuration - $gTimebombMinimumDuration))]]
@@ -132,11 +132,11 @@ proc StartTimeBomb {theStarter theNick theChannel} {
     set gCorrectWire [lindex $listOfWires [expr int( rand() * $numberOfWires )]]
     set wireListAsEnglish [MakeEnglishList $listOfWires]
     set wireCountAsEnglish [lindex $gNumberNames $numberOfWires]
-    IRCAction $theChannel "stuffs the bomb into $gTimebombTarget's pants.  The display reads \[\002$timerDuration\002\] seconds."
+    IRCAction $theChannel "tangka kong buka dpe calana kase maso bom dalam cd pa $gTimebombTarget ngana pe waktu cuma \[\002$timerDuration\002\] seconds."
     if { $numberOfWires == 1 } {
-      IRCPrivMSG $theChannel "Diffuse the bomb by cutting the correct wire. There is $wireCountAsEnglish wire. It is $wireListAsEnglish."
+      IRCPrivMSG $theChannel "harus hati-hati, potong tu kabel yang bekeng ngana selamat, cuma ada kabel $wireCountAsEnglish. warna $wireListAsEnglish."
     } else {
-      IRCPrivMSG $theChannel "Diffuse the bomb by cutting the correct wire. There are $wireCountAsEnglish wires. They are $wireListAsEnglish."
+      IRCPrivMSG $theChannel "harus hati-hati, potong tu kabel yang bekeng ngana selamat, cuma ada kabel $wireCountAsEnglish. warna $wireListAsEnglish."
     }
     note "Timebomb started by $theStarter (Bomb handed to $theNick it will detonate in $timerDuration seconds)"
     set gTimebombActive 1
