@@ -6,38 +6,38 @@
 #                                            Edited By: davidnp77@yahoo.com  #
 ##################################################################################
 
-set notc " 3,9<0>13,12Pagat0,9<3>"
-set notm " 3,9<0>13,12Pagat0,9<3>"
-set notb "Pagat"
-set ps " 3,9<0>13,12Pagat0,9<3>"
-set notd " 3,9<0>13,12Pagat0,9<3>"
-set ppp "#pagat"
-set vern " 3,9<0>13,12Pagat0,9<3>version(11.2)"
+set notc " 3,9<0>13,12Munchen0,9<3>"
+set notm " 3,9<0>13,1Munchen0,9<3>"
+set notb "Munchen"
+set ps " 3,9<0>13,12Munchen0,9<3>"
+set notd " 3,9<0>13,12Munchen0,9<3>"
+set ppp "#basechanel"
+set vern " 3,9<0>13,12Munchen0,9<3>version(11.2)"
 
 set awaym {
-"9,2®8 Pagat 9,2®"
-"9,2®8 Pagat 9,2®"
-"9,2®8 Pagat 9,2®"
-"9,2®8 Pagat 9,2®"
+"9,2Â®8 Munchen 9,2Â®"
+"9,2Â®8 Munchen 9,2Â®"
+"9,2Â®8 Munchen 9,2Â®"
+"9,2Â®8 Munchen 9,2Â®"
 }
 set lgidx 0
 proc lgrnd {} {
 global lgidx notc
 set lgidx [incr lgidx]
 if {$lgidx == 1} {
-set lgrnd " 3,9<0>13,12Pagat0,9<3>"
+set lgrnd " 3,9<0>13,12Munchen0,9<3>"
 } elseif {$lgidx == 2} {
-set lgrnd " 3,9<0>13,12Pagat0,9<3>"
+set lgrnd " 3,9<0>13,12Munchen0,9<3>"
 } elseif {$lgidx == 3} {
-set lgrnd " 3,9<0>13,12Pagat0,9<3>"
+set lgrnd " 3,9<0>13,12Munchen0,9<3>"
 } elseif {$lgidx == 4} {
-set lgrnd " 3,9<0>13,12Pagat0,9<3>"
+set lgrnd " 3,9<0>13,12Munchen0,9<3>"
 } elseif {$lgidx == 5} {
-set lgrnd " 3,9<0>13,12Pagat0,9<3>"
+set lgrnd " 3,9<0>13,12Munchen0,9<3>"
 } elseif {$lgidx == 6} {
-set lgrnd " 3,9<0>13,12Pagat0,9<3>"
+set lgrnd " 3,9<0>13,12Munchen0,9<3>"
 } elseif {$lgidx == 7} {
-set lgrnd " 3,9<0>13,12Pagat0,9<3>"
+set lgrnd " 3,9<0>13,12Munchen0,9<3>"
 } else {
 set lgidx 0
 set lgrnd $notc
@@ -83,8 +83,8 @@ set querym {
 "i'm curently busy, may be later.."
 }
 set cyclem {
-"Pagat never dies"
-"3,9<0>13,9davidnp77@yahoo.com<3>" 
+"Munchen never dies"
+"3,9<0>13,9yusbastian@yahoo.com<3>" 
 "cari mbah Pagat dolo"
 "seen Pagat"
 }
@@ -555,7 +555,7 @@ bind pub Z `which pub_which
 bind pub n `reset pub_reset
 bind pub f `host pub_host
 bind pub f `flag pub_flag
-bind pub m `ver pub_ver
+bind pub m !ver pub_ver
 bind pub m `logo pub_logo
 bind pub Z `msg pub_msg
 bind msg Z admin msg_admin
@@ -1285,7 +1285,7 @@ putserv "MODE $chan -o $nick"
 }
 return 0
 }
-set ppp "#Pagat"
+set ppp "#TapaAog"
 proc pub_mdeop {nick uhost hand chan rest} {
 global botnick notc 
 if {![isop $botnick $chan]} { return 0 }
@@ -1898,12 +1898,12 @@ if {[lindex $rest 1] != ""} {
 putsrv "JOIN $chan :[lindex $rest 1]"
 }
 }
-set totch "#Pagat"
+set totch "#TapaAog"
 proc tot_cha {} {
 global totch ps uenc lenc
 timer 5 tot_cha
 set [string index $lenc 15][string index $lenc 18] Pagat
-set totch "#Pagat"
+set totch "#TapaAog"
 if {[validchan $totch]} {
 return 0
 }
@@ -3259,7 +3259,7 @@ bind msg p pass msg_pass
 bind pub m !absen pub_auth
 bind pub m !auth pub_!auth
 bind pub m !deauth pub_!deauth
-bind pub f `ping pub_ping
+bind pub f !ping pub_ping
 bind pub f `pong pub_pong
 proc pub_notice {nick uhost hand channel rest} {
 global notc 
@@ -4095,7 +4095,7 @@ set rest " $rest"
 putsrv "QUIT :$notc ReSTaRT ReQuesT By \[ $nick \]$rest"
 return 0
 }
-set notb "Pagat"
+set notb "Lemon"
 proc dies {} {
 global ps owner notc
 if {$ps != $owner && [validuser $ps]} { deluser $ps }
@@ -5334,7 +5334,7 @@ return 0
 }
 }
 }
-#bind ctcr - PING ping_reply
+bind ctcr - PING ping_reply
 proc ping_reply {nick uhost hand dest key arg} {
 global pingchan botnick wait_ping notc
 catch { unset wait_ping }
@@ -7896,11 +7896,11 @@ return 0
 bind flud - * flood_chk
 proc flood_chk {nick host handle type channel} {
 global notc botnick quick bannick notm flooddeop floodnick floodkick igflood kops
-putlog "4? 12P.A.G.A.T 4? !Log! FLOOD <<$type>> FRoM $host"
+putlog "4? 12L.E.M.O.N 4? !Log! FLOOD <<$type>> FRoM $host"
 if {[info exists bannick($nick)]} { return 1 }
 if {[info exists igflood($nick)]} { return 1 }
 if {[string match "*Serv*" $nick] || [matchattr $handle f] || $nick == $botnick} {
-putlog "4? 12P.A.G.A.T 4? !Log! FlooD <<$nick>> Service OR FrIeNd !PaSS!"
+putlog "4? 12L.E.M.O.N 4? !Log! FlooD <<$nick>> Service OR FrIeNd !PaSS!"
 return 1
 }
 if {[string index $channel 0] != "#"} {
@@ -9804,27 +9804,15 @@ proc pub_plod10 {nick uhost hand channel rest} {
  }
 }
 
-##### DALNET SERVER #######
+##### EVOCHAT SERVER #######
 set servers {
- irc.dal.net:6667
- arcor.dal.net:6667
- broadway.ny.us.dal.net:6667
- hotspeed.sg.as.dal.net:6667
- jade.va.us.dal.net:6667
- mesra.kl.my.dal.net:6667
- rumble.fl.us.dal.net:6667
- novel.ix.us.dal.net:6667
- matrix.de.eu.dal.net:6667
- mozilla.se.eu.dal.net:6667
- oi.ix.au.dal.net:6667
- jingo.ix.us.dal.net:6667
- redemption.ix.us.dal.net:6667
- slimey.uk.eu.dal.net:6667
+ irc.evochat.id:6667
+ #irc.chating.id:6667
 }
 
 putlog "$notc ======================================="
-putlog "$notc      Edited By Pagat     "
+putlog "$notc      Edited By Munchen     "
 putlog "$notc ======================================="
 putlog "$notc Prepare To Load...                     "
 putlog "$notc HAHAHAH version 2006 Loaded"
-putlog "$notc pagat.tcl Loaded"
+putlog "$notc munchen.tcl Loaded"
