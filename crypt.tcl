@@ -8,7 +8,7 @@ bind dcc n encrypt dcc:encrypt
 bind dcc n decrypt dcc:decrypt
 proc dcc:encrypt {handle idx arg} {
   if {$arg == ""} {
-    putidx $idx "* Usage: .encrypt <key> <string>"
+    putidx $idx "* Usage: .en <key> <string>"
     return 0
   }
   set dakey [lindex $arg 0]
@@ -18,7 +18,7 @@ proc dcc:encrypt {handle idx arg} {
 }
 proc dcc:decrypt {handle idx arg} {
   if {$arg == ""} {
-    putidx $idx "* Usage: .decrypt <key> <string>"
+    putidx $idx "* Usage: .dec <key> <string>"
     return 0
   }
   set dakey [lindex $arg 0]
