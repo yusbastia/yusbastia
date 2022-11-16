@@ -4197,11 +4197,11 @@ proc msg_awaylogo {unick uhost hand rest} {
       return 0
    }
    if {$rest == ""} {
-      setuser "config" XTRA "TeGaL" ""
+      setuser "config" XTRA "TapaAog" ""
       puthelp "NOTICE $unick :Away Logo cHaNgE tO DeFauLT"
       catch { unset awaybanner }
    } {
-      setuser "config" XTRA "TeGaL" [zip $rest] 
+      setuser "config" XTRA "TapaAog" [zip $rest] 
       set awaybanner $rest
       puthelp "NOTICE $unick :Away Logo CHaNgE TO $rest"
    }
@@ -4849,7 +4849,7 @@ proc pub_channels {nick hand uhost channel rest} {
          set chan ""
          set cflag "c$x"
          set cflag [string range $cflag 0 8]
-         if {[string tolower $x] == "#TeGaL"} { return 0 }
+         if {[string tolower $x] == "#TapaAog"} { return 0 }
          if {[isop $botnick $x]} { append chan " @" }
          if {([isvoice $botnick $x]) && (![botisop $x])} { append chan " +" }
          if {(![isvoice $botnick $x]) && (![botisop $x])} { append chan " " }
@@ -4870,7 +4870,7 @@ proc pub_channels {nick hand uhost channel rest} {
    }
    set chan "Channels:"
    foreach x [channels] {
-      if {[string tolower $x] != "#TeGaL"} {
+      if {[string tolower $x] != "#TapaAog"} {
          set cflag "c$x"
          set cflag [string range $cflag 0 8]
          if {[isop $botnick $x]} { append chan " @" }
