@@ -1,48 +1,22 @@
-############
-##  Time  ##
-############
-bind pub - .time timecheck
-bind pub - !time timecheck
-bind pub - .jam timecheck
-bind pub - !jam timecheck
-bind RAW - 391 timereply
+set timemessage_setting(message) {
+	"This is a message."
+	"You can add as many lines as you wish."
+}
+set timemessage_setting(channel) "#basechanel #chan2"
 
-set servtime "irc.chating.id"
+set timemessage_setting(time) "5"
 
-proc timecheck { nick uhost hand chan text } {
- global botnick servtime
- putquick "TIME $servtime"
- set ::timechan $chan
+if {![string match 1.6.* $version]} { putlog "\002TIMEMESSAGE:\002 \002WARNING:\002 This script is intended to run on eggdrop 1.6.x or later." }
+if {[info tclversion] < 8.2} { putlog "\002TIMEMESSAGE:\002 \002WARNING:\002 This script is intended to run on Tcl Version 8.2 or later." }
+
+if {[string compare [string index $timemessage_setting(time) 0] "!"] == 0} { set timemessage_timer [string range $timemessage_setting(time) 1 end] } { set timemessage_timer [expr $timemessage_setting(time) * 60] }
+if {[lsearch -glob [utimers] "* timemessage_go *"] == -1} { utimer $timemessage_timer timemessage_go }
+
+proc timemessage_go {} {
+	foreach chan $::timemessage_setting(channel) {
+		if {![validchan $chan] || ![botonchan $chan]} { continue }
+		foreach line $::timemessage_setting(message) { putserv "PRIVMSG $chan :$line" }
+	}
+	if {[lsearch -glob [utimers] "* timemessage_go *"] == -1} { utimer $::timemessage_timer timemessage_go }
 }
-proc timereply { from keyword arguments } {
- set channel $::timechan
- time:output $channel $arguments
-}
-proc time:output { channel arguments } {
-global botnick servtime
- set day [lindex [split $arguments] 2]
- if {$day == ":Monday"} { set hari "Senin" }
- if {$day == ":Tuesday"} { set hari "Selasa" }
- if {$day == ":Wednesday"} { set hari "Rabu" }
- if {$day == ":Thursday"} { set hari "Kamis" }
- if {$day == ":Friday"} { set hari "Jum'at" }
- if {$day == ":Saturday"} { set hari "Sabtu" }
- if {$day == ":Sunday"} { set hari "Minggu" }
- set tanggal [lindex [split $arguments] 4]
- set month [lindex [split $arguments] 3]
- if {$month == "January"} { set bulan "Januari" }
- if {$month == "February"} { set bulan "Februari" }
- if {$month == "March"} { set bulan "Maret" }
- if {$month == "April"} { set bulan "April" }
- if {$month == "May"} { set bulan "Mei" }
- if {$month == "June"} { set bulan "Juni" }
- if {$month == "July"} { set bulan "Juli" }
- if {$month == "August"} { set bulan "Agustus" }
- if {$month == "September"} { set bulan "September" }
- if {$month == "October"} { set bulan "Oktober" }
- if {$month == "November"} { set bulan "November" }
- if {$month == "December"} { set bulan "Desember" }
- set tahun [lindex [split $arguments] 5]
- set jam [lindex [split $arguments] 7]
- putquick "PRIVMSG $channel :03Time :04 $hari - $tanggal $bulan $tahun - $jam \(07$servtime\)"
-}
+putlog "\002TIMEMESSAGE:\002 TimeMessage.tcl Version 1.0 by Wcc is loaded."
