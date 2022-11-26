@@ -46,6 +46,8 @@
 
 # Public triggers, seperated by spaces.
 set pingpubwords "!ping !pingme"
+set pingpubwords "lag lagme"
+set pingpubwords "ping pingme"
 
 # /msg triggers, seperated by spaces.
 set pingmsgwords "ping pingme"
