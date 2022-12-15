@@ -17,7 +17,7 @@ proc slowmsg {file {pos 0}} {
   set f [open $file] 
   seek $f $pos 
   if {[gets $f line]>-1} { 
-    putserv "privmsg #tomohon :$line" 
+    putserv "privmsg #tapaaog :$line" 
     set story_timers($file) [utimer 11 [list slowmsg $file [tell $f]]] 
     } else { 
     utimer 15 [list putserv "Re-reading the story:"] 
