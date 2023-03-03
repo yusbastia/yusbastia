@@ -1,9 +1,9 @@
 set scriptname "FreeZNC management script"
 set scriptOwner "Lemon"
 set scriptOwnerMail "yuslemon91@gmail.com"
-set scriptUpdater "Lemon"
-set scriptUpdaterMail "yus@fromhell.ee"
-set scriptchannel "#yobayat"
+set scriptUpdater "Ares"
+set scriptUpdaterMail "Ares8430@gmail.com"
+set scriptchannel "#Yobayat"
 set scriptOwnerNetwork "irc.chating.id"
 set scriptUpdaterNetwork "irc.chating.id @chatingID"
 set scriptversion "0.7.0.1"
@@ -15,23 +15,23 @@ set adverticeScriptOwner 0
 set scriptCommandPrefix "!"
 set sendmailPath "/usr/sbin/sendmail"
 set zncprefix "*"
-set znchost "ln-bnc-us-bncpipe-us-01.bncpipe.net"
-set zncNonSSLPort "5026"
-set zncSSLPort "+5026"
-set zncWebNonSSLPort "5026"
+set znchost "freeirc.org"
+set zncNonSSLPort "2022"
+set zncSSLPort ""
+set zncWebNonSSLPort "2022"
 set zncWebSSLPort ""
 set zncAdminName "LemonZNC"
-set zncAdminMail "yus@fromhell.ee"
-set zncRequestMail "yuslemkn91@gmail.com"
-set zncnetworkname "chating"
+set zncAdminMail "yuslemon91@gmail.com"
+set zncRequestMail "yuslemon91@gmail.com"
+set zncnetworkname "chatingID"
 set zncircserver "irc.chating.id"
 set zncircserverport "6667"
-set zncChannelName "#yobayat,#tapaaog"
+set zncChannelName "#Tapaaog,#Yobayat"
 set defaultUserModules { "lastseen" "chansaver" "controlpanel" "buffextras" "autoreply \"I'll be back soon\""}
 set zncDefaultUserModules { "controlpanel" }
 proc mail:sendTo:user { from to subject content {cc "" } } {
         global sendmailPath zncnetworkname zncAdminMail zncRequestMail
-        set msg {From: IRC Network FreeZNC <znc.indoirc@gmail.com>  }
+        set msg {From: IRC Network FreeZNC <znc.lemon@gmail.com>  }
         append msg \n "To: " [join $to , ]
         append msg \n "Cc: " [join $cc , ]
         append msg \n "Subject: $subject"
@@ -82,7 +82,7 @@ proc znc:request { nick host handle chan text } {
                                         }
                                 }
                         }
-                        puthelp "NOTICE $nick :Hai \00304$nick\003, Request FreeZNC@tapaaog.com untuk \00304$username\003 sudah diterima, Ketik \00304!Confirm $username\003 untuk aktivasi ZNC"
+                        puthelp "NOTICE $nick :Hai \00304$nick\003, Request FreeZNC@chating.id untuk \00304$username\003 sudah diterima, Ketik \00304!Confirm $username\003 untuk aktivasi ZNC"
                 } else {
                         puthelp "NOTICE $nick :Maaf...permintaan ZNC dengan username $username tersebut sudah dipakai, silahkan request dengan username lain, terima kasih"
                 }
@@ -105,16 +105,16 @@ proc znc:confirm {requester host handle chan text} {
 #               mail:simply:sendUserRequest3 $username $password
                 znc:blockuser:unblock $username
                 chattr $username -C
-                puthelp "PRIVMSG $chan :$username sudah dikonfirmasi, Terima kasih telah menggunakan ZNC dari Irc.Tapaaog.com, Untuk Detail silahkan Check Private Msg"
+                puthelp "PRIVMSG $chan :$username sudah dikonfirmasi, Terima kasih telah menggunakan freeZNC dari #yobayat, Untuk Detail silahkan Check Private Msg"
 				puthelp "PRIVMSG $requester :Detail Akun ZNC untuk $username Support By Lemon :"
 				puthelp "PRIVMSG $requester :Username = $username"
 				puthelp "PRIVMSG $requester :Password = $password"
-				puthelp "PRIVMSG $requester :Server = ln-bnc-us-bncpipe-us-01.bncpipe.net"
-				puthelp "PRIVMSG $requester :Port = 5026 ssl +5026"
+				puthelp "PRIVMSG $requester :Server = freeirc.org"
+				puthelp "PRIVMSG $requester :Port = 2022"
 				puthelp "PRIVMSG $requester :Ident = $username"
-				puthelp "PRIVMSG $requester :ZNC webpanel : http://ln-bnc-us-bncpipe-us-01.bncpipe.net:6969 login \00304$username\003 password \00304$password\003"
-				puthelp "PRIVMSG $requester :Cara pakai ZNC : Ganti IDENT dengan \00304$username\003 lalu konek ke ZNC dengan perintah /server znc.indoirc.my.id 6969 $username:$password"
-				puthelp "PRIVMSG $requester :\00304DILARANG\003 Jumpserver dari chatingID Network dan Jika ingin Menambah Network silahkan hubungi Admin yg aktive di ~#yobayat"
+				puthelp "PRIVMSG $requester :ZNC webpanel : http://freeirc.org:2022 login \00304$username\003 password \00304$password\003"
+				#puthelp "PRIVMSG $requester :Cara pakai ZNC : Ganti IDENT dengan \00304$username\003 lalu konek ke ZNC dengan perintah /server freeirc.org 2022 $username:$password"
+				#puthelp "PRIVMSG $requester :\00304DILARANG\003 Jumpserver dari IndoIRC Network dan Jika ingin Menambah Network silahkan hubungi Admin yg aktive di ~#yobayat"
                 znc:controlpanel:AddServer $username $zncnetworkname $zncircserver:$zncircserverport
                 znc:controlpanel:AddChan $username $zncnetworkname $zncChannelName
         } elseif [ validuser $username ] {
