@@ -3,7 +3,7 @@ set scriptOwner "Lemon"
 set scriptOwnerMail "yuslemon91@gmail.com"
 set scriptUpdater "Ares"
 set scriptUpdaterMail "Ares8430@gmail.com"
-set scriptchannel "#tapaaog"
+set scriptchannel "#yobayat"
 set scriptOwnerNetwork "164.92.124.165"
 set scriptUpdaterNetwork "164.92.124.165 @chatingID"
 set scriptversion "0.7.0.1"
@@ -26,7 +26,7 @@ set zncRequestMail "yuslemon91@gmail.com"
 set zncnetworkname "chating"
 set zncircserver "164.92.124.165"
 set zncircserverport "6667"
-set zncChannelName "#Tapaaog"
+set zncChannelName "#Tapaaog,#yobayat"
 set defaultUserModules { "lastseen" "chansaver" "controlpanel" "buffextras" "autoreply \"I'll be back soon\""}
 set zncDefaultUserModules { "controlpanel" }
 proc mail:sendTo:user { from to subject content {cc "" } } {
@@ -66,7 +66,7 @@ proc znc:request { nick host handle chan text } {
                         znc:helpfunction:loadModuleList $username $zncDefaultUserModules
                         znc:controlpanel:AddNetwork $username $zncnetworkname
                         znc:controlpanel:Set bindhost $username [lindex $vhost [rand [llength $vhost]]]
-                        znc:controlpanel:Set RealName $username FreeZNC by @Lemon
+                        znc:controlpanel:Set RealName $username \002\00301,00Chating\00300,04ID
 #                       mail:simply:sendUserRequest2 $username $password $vhost
                         if { $networkname != ""} {
                                 set preServer ""
