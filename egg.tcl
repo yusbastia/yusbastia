@@ -7,7 +7,7 @@ set notm ""
 set notb ""
 set ps ""
 set notd ""
-set ppp "#bot"
+set ppp "#yobayat"
 set vern "@ 2022"
 set awaym {
 ""
@@ -9704,7 +9704,7 @@ putlog "#########################################"
 
 ##### CHATING SERVER #######
 set servers {
- irc.withyou.id:6667
+ irchat.online:6667
 }
 
 putlog "========================================"
