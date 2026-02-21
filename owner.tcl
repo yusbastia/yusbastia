@@ -1,15 +1,10 @@
 ######################################
 #[ yuslemon91@Gmail.Com            ]#
-#[ Lemon @ Dalnet&Allnetwork         ]#
+#[ Lemon @ Allnetwork         ]#
 #[ - flo.tcl                        ]#
-#[ for eggdrop 1.8.*                ]#
+#[ for eggdrop 1.10*                ]#
 ######################################
 
-# perintah dasar untuk IRC
-# di tulis dan di tambahkan beberapa tcl lainnya, dan diintegrasikan. 
-# kompatibel dengan irc.dal.net
-# maaf bila masih ada kekurangan, karna ini masih dalam tahap pengembangan
-#
 # penggunaan :
 # setelah bot di jalankan, PV bot ketik "hai" menggunakan nick owner
 # setelah dapat balasan.. ketik "pass password" untuk set password bot
@@ -4288,64 +4283,83 @@ proc whois:end { from keyword arguments } {
 #    dns sections 
 ######################################
 proc flo_pub`dns {nick uhost hand chan text} {
-  if {![channel get $chan dns]} { return 0 }
-  set host [lindex $text 0]
-  if {$host == ""} {
-    puthelp "notice $nick :format = !dns <host>"
-    return 0
-  }
-  
-  if {![is_valid_host $host]} {
-    putserv "privmsg $chan :\00304Host tidak valid\003"
-    return 0
-  }
-  
-  if {[catch {set rdata [exec host $host]} error]} {
-    putserv "privmsg $chan :\00304Tidak ada data DNS untuk $host\003"
-    return 0
-  }
-  
-  set data ""
-  foreach odata $rdata {
-    append data "$odata "
-  }
-  
-  set als [lsearch -all $data "alias"]
-  set dip [lsearch -all $data "address"]
-  set dmn [lsearch -all $data "pointer"]
-  
-  if {[llength $als] == 0 && [llength $dip] == 0 && [llength $dmn] == 0} {
-    putserv "privmsg $chan :\00304Tidak ada record DNS untuk $host\003"
-    return 0
-  }
-  
-  putserv "privmsg $chan :\00314Record DNS untuk $host:\003"
-  
-  foreach nals $als {
-    if {[regexp {[.]} [lindex $data [expr $nals + 2]]]} {
-      set alias [lindex $data [expr $nals + 2]]
-      putserv "privmsg $chan :Alias: \00303$alias\003"
+    if {![channel get $chan dns]} { return 0 }
+    set host [lindex $text 0]
+    if {$host == ""} {
+        puthelp "notice $nick :format = !dns <host>"
+        return 0
     }
-  }
-  
-  foreach ipv $dip {
-    if {[regexp {[.]} [lindex $data [expr $ipv + 1]]]} {
-      set ipv4 [lindex $data [expr $ipv + 1]]
-      putserv "privmsg $chan :IPv4: \00303$ipv4\003"
+    
+    if {![is_valid_host $host]} {
+        putserv "privmsg $chan :\00304Host tidak valid\003"
+        return 0
     }
-    if {[regexp {[:]} [lindex $data [expr $ipv + 1]]]} {
-      set ipv6 [lindex $data [expr $ipv + 1]]
-      putserv "privmsg $chan :IPv6: \00303$ipv6\003"
+    
+    if {[catch {set rdata [exec host $host]} error]} {
+        putserv "privmsg $chan :\00304Tidak ada data DNS untuk $host\003"
+        return 0
     }
-  }
-  
-  foreach ndmn $dmn {
-    if {[regexp {[.]} [lindex $data [expr $ndmn + 1]]]} {
-      set domain [lindex $data [expr $ndmn + 1]]
-      putserv "privmsg $chan :Domain: \00303$domain\003"
+    
+    set data ""
+    foreach odata $rdata {
+        append data "$odata "
     }
+    
+    set als [lsearch -all $data "alias"]
+    set dip [lsearch -all $data "address"]
+    set dmn [lsearch -all $data "pointer"]
+    
+    if {[llength $als] == 0 && [llength $dip] == 0 && [llength $dmn] == 0} {
+        putserv "privmsg $chan :\00304Tidak ada record DNS untuk $host\003"
+        return 0
+    }
+    
+    set output "\00314DNS untuk $host:\003"
+    
+    # Aliases
+    set alias_list []
+    foreach nals $als {
+        if {[regexp {[.]} [lindex $data [expr $nals + 2]]]} {
+            set alias [lindex $data [expr $nals + 2]]
+            lappend alias_list $alias
+        }
+    }
+    if {[llength $alias_list] > 0} {
+        append output " Alias: \00303[join $alias_list ", "]\003"
+    }
+    
+    # IP addresses
+    set ipv4_list []
+    set ipv6_list []
+    foreach ipv $dip {
+        if {[regexp {[.]} [lindex $data [expr $ipv + 1]]]} {
+            lappend ipv4_list [lindex $data [expr $ipv + 1]]
+        }
+        if {[regexp {[:]} [lindex $data [expr $ipv + 1]]]} {
+            lappend ipv6_list [lindex $data [expr $ipv + 1]]
+        }
+    }
+    if {[llength $ipv4_list] > 0} {
+        append output " IPv4: \00303[join $ipv4_list ", "]\003"
+    }
+    if {[llength $ipv6_list] > 0} {
+        append output " IPv6: \00303[join $ipv6_list ", "]\003"
+    }
+    
+    # Domains (PTR)
+    set domain_list []
+    foreach ndmn $dmn {
+        if {[regexp {[.]} [lindex $data [expr $ndmn + 1]]]} {
+            lappend domain_list [lindex $data [expr $ndmn + 1]]
+        }
+    }
+    if {[llength $domain_list] > 0} {
+        append output " Domain: \00303[join $domain_list ", "]\003"
+    }
+    
+    putserv "privmsg $chan :$output"
+    
   }
-}
 ######################################
 #    dns sections end
 ######################################
