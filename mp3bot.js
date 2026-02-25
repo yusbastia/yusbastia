@@ -205,10 +205,8 @@ async function downloadWithYtDlp(query, type = 'mp3') {
         if (type === 'mp3') {
             console.log(`${colors.green}│${colors.white}  ${emoji.cover} Cover art: ✅${colors.reset}`);
         }
-        console.log(`${colors.green}│${colors.white}  ${emoji.link} Link: ${colors.blue}${url}${colors.reset}`);
-        console.log(`${colors.green}├──────────────────────────────────────┤${colors.reset}`);
-        // Ganti footer dengan signature baru
-        console.log(`${colors.green}│${colors.purple}  ${signature}${colors.purple}        │${colors.reset}`);
+        // Gabungkan link dengan signature (hanya spasi)
+        console.log(`${colors.green}│${colors.white}  ${emoji.link} Link: ${colors.blue}${url}  ${colors.purple}${signature}${colors.reset}`);
         console.log(`${colors.green}╰──────────────────────────────────────╯${colors.reset}`);
 
         console.log(`${colors.yellow}${emoji.clock} File akan dihapus dalam ${config.tubeRest} detik...${colors.reset}`);
@@ -318,10 +316,8 @@ bot.addListener('message', async (from, to, text) => {
             bot.say(to, `│  ⏱️ Durasi: ${result.duration}`);
             bot.say(to, `│  💿 Album: ${result.uploader}`);
             bot.say(to, `│  🖼️ Cover art: ✅ (terembed)`);
-            bot.say(to, `│  🔗 Link: ${result.url}`);
-            bot.say(to, `├──────────────────────────────────────┤`);
-            // Ganti footer dengan signature baru
-            bot.say(to, `│  ${signature}        │`);
+            // Gabungkan link dengan signature (hanya spasi, tanpa "|")
+            bot.say(to, `│  🔗 Link: ${result.url}  ${signature}`);
             bot.say(to, `╰──────────────────────────────────────╯`);
             
             bot.say(to, `⏳ File akan dihapus dalam ${config.tubeRest} detik...`);
@@ -360,10 +356,8 @@ bot.addListener('message', async (from, to, text) => {
             bot.say(to, `│  📊 Ukuran: ${result.size}`);
             bot.say(to, `│  ⏱️ Durasi: ${result.duration}`);
             bot.say(to, `│  💿 Album: ${result.uploader}`);
-            bot.say(to, `│  🔗 Link: ${result.url}`);
-            bot.say(to, `├──────────────────────────────────────┤`);
-            // Ganti footer dengan signature baru
-            bot.say(to, `│  ${signature}        │`);
+            // Gabungkan link dengan signature (hanya spasi)
+            bot.say(to, `│  🔗 Link: ${result.url}  ${signature}`);
             bot.say(to, `╰──────────────────────────────────────╯`);
             
             bot.say(to, `⏳ File akan dihapus dalam ${config.tubeRest} detik...`);
