@@ -16,6 +16,9 @@ const config = {
     autoDeleteDelay: 60000 // hapus file setelah 60 detik
 };
 
+// Tanda tangan khas
+const signature = "𝓨𝓾𝓼 𝓑𝓪𝓼𝓽𝓲𝓪𝓷 〰";
+
 // Buat folder download jika belum ada
 if (!fs.existsSync(config.downloadDir)) {
     fs.mkdirSync(config.downloadDir, { recursive: true });
@@ -42,20 +45,45 @@ function formatSize(bytes) {
     return 'Inf';
 }
 
+function formatDuration(seconds) {
+    if (!seconds || seconds === 'N/A') return 'N/A';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 // ===================== ENDPOINT API UNTUK DAFTAR FILE =====================
 app.get('/api/files', (req, res) => {
     try {
         const files = fs.readdirSync(config.downloadDir)
             .filter(f => f.endsWith('.mp3') || f.endsWith('.mp4'))
-            .map(f => ({
-                name: f,
-                url: `/get/${encodeURIComponent(f)}`,
-                size: formatSize(fs.statSync(path.join(config.downloadDir, f)).size),
-                created: fs.statSync(path.join(config.downloadDir, f)).mtime
-            }))
+            .map(f => {
+                const filePath = path.join(config.downloadDir, f);
+                const stat = fs.statSync(filePath);
+                // Cari file metadata dengan nama yang sama + .json
+                const metaPath = filePath + '.json';
+                let metadata = {};
+                if (fs.existsSync(metaPath)) {
+                    try {
+                        metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+                    } catch (e) {
+                        console.warn(`Gagal baca metadata ${metaPath}:`, e.message);
+                    }
+                }
+                return {
+                    name: f,
+                    url: `/get/${encodeURIComponent(f)}`,
+                    size: formatSize(stat.size),
+                    created: stat.mtime,
+                    title: metadata.title || f.replace(/\.(mp3|mp4)$/, ''),
+                    uploader: metadata.uploader || 'Unknown',
+                    duration: metadata.duration ? formatDuration(metadata.duration) : '?',
+                    album: metadata.uploader || 'Unknown' // album = uploader
+                };
+            })
             .sort((a, b) => b.created - a.created);
         
-        res.json(files);
+        res.json({ files, signature });
     } catch (err) {
         console.error('Gagal membaca folder download:', err);
         res.status(500).json({ error: 'Gagal memuat daftar file' });
@@ -83,14 +111,13 @@ app.get('/', (req, res) => {
                 justify-content: center;
             }
             .container {
-                max-width: 800px;
+                max-width: 1000px;
                 width: 100%;
                 background: rgba(255, 255, 255, 0.95);
                 backdrop-filter: blur(10px);
                 border-radius: 24px;
                 padding: 40px;
                 box-shadow: 0 30px 60px rgba(0,0,0,0.3);
-                transition: transform 0.3s ease;
             }
             h1 {
                 font-size: 2.5rem;
@@ -145,14 +172,11 @@ app.get('/', (req, res) => {
                 font-weight: 600;
                 cursor: pointer;
                 transition: all 0.3s ease;
-                position: relative;
-                overflow: hidden;
             }
             button:hover {
                 transform: translateY(-2px);
                 box-shadow: 0 10px 25px rgba(102,126,234,0.4);
             }
-            button:active { transform: translateY(0); }
             .loading {
                 display: none;
                 text-align: center;
@@ -175,8 +199,6 @@ app.get('/', (req, res) => {
                 border-radius: 12px;
                 margin: 20px 0;
                 display: none;
-                align-items: center;
-                gap: 10px;
                 border: 1px solid #fcc;
             }
             .success {
@@ -187,24 +209,34 @@ app.get('/', (req, res) => {
                 margin: 20px 0;
                 border: 1px solid #a5d6a7;
             }
-            .success h3 { margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-            .file-info {
+            .success h3 { margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+            .track-info {
                 background: white;
-                border-radius: 8px;
-                padding: 15px;
+                border-radius: 12px;
+                padding: 20px;
                 margin-top: 15px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             }
-            .file-info p {
-                margin: 8px 0;
+            .track-row {
                 display: flex;
-                align-items: center;
-                gap: 8px;
+                padding: 10px 0;
+                border-bottom: 1px dashed #e0e0e0;
             }
-            .file-info a {
-                color: #764ba2;
-                text-decoration: none;
+            .track-row:last-child { border-bottom: none; }
+            .track-label {
+                width: 100px;
                 font-weight: 600;
-                word-break: break-all;
+                color: #666;
+            }
+            .track-value {
+                flex: 1;
+                color: #333;
+                word-break: break-word;
+            }
+            .signature-text {
+                color: #888;
+                font-style: italic;
+                margin-left: 5px;
             }
             .recent-files {
                 margin-top: 40px;
@@ -226,10 +258,11 @@ app.get('/', (req, res) => {
             }
             .file-item {
                 background: #f8f9fa;
-                border-radius: 10px;
-                padding: 12px 15px;
-                display: flex;
-                justify-content: space-between;
+                border-radius: 12px;
+                padding: 15px;
+                display: grid;
+                grid-template-columns: 2fr 1fr 1fr 1fr auto;
+                gap: 15px;
                 align-items: center;
                 transition: all 0.3s ease;
                 border: 1px solid #eee;
@@ -240,20 +273,29 @@ app.get('/', (req, res) => {
                 transform: translateX(5px);
                 box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             }
-            .file-name {
-                font-weight: 500;
+            .file-title {
+                font-weight: 600;
                 color: #333;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
-                max-width: 300px;
             }
-            .file-size {
+            .file-artist {
                 color: #666;
                 font-size: 0.9rem;
+            }
+            .file-album {
+                color: #888;
+                font-size: 0.9rem;
+            }
+            .file-duration {
+                color: #555;
+                font-size: 0.9rem;
                 background: #eee;
-                padding: 4px 10px;
+                padding: 4px 8px;
                 border-radius: 20px;
+                text-align: center;
+                width: fit-content;
             }
             .file-download {
                 color: #764ba2;
@@ -262,6 +304,7 @@ app.get('/', (req, res) => {
                 padding: 6px 12px;
                 border-radius: 20px;
                 transition: all 0.3s ease;
+                white-space: nowrap;
             }
             .file-download:hover {
                 background: #764ba2;
@@ -285,7 +328,7 @@ app.get('/', (req, res) => {
         <div class="container">
             <h1>🍋 LEMON Downloader</h1>
             <div class="subtitle">
-                Download video & audio dari YouTube, Facebook, dan banyak lagi — langsung!
+                Download video & audio dari YouTube, Facebook, dan banyak lagi — dengan metadata lengkap!
             </div>
 
             <form id="downloadForm">
@@ -317,7 +360,7 @@ app.get('/', (req, res) => {
             </div>
 
             <footer>
-                <p>File akan tersedia selama 60 detik setelah download.</p>
+                <p>File akan tersedia selama 60 detik setelah download. Signature: ${signature}</p>
             </footer>
         </div>
 
@@ -351,14 +394,14 @@ app.get('/', (req, res) => {
                         throw new Error(errorText);
                     }
 
-                    const blob = await response.blob();
-                    const contentDisposition = response.headers.get('Content-Disposition');
-                    let filename = 'download.' + type;
-                    if (contentDisposition) {
-                        const match = contentDisposition.match(/filename="(.+)"/);
-                        if (match) filename = match[1];
-                    }
+                    // Baca metadata dari header
+                    const title = response.headers.get('X-Metadata-Title') || 'Unknown';
+                    const uploader = response.headers.get('X-Metadata-Uploader') || 'Unknown';
+                    const duration = response.headers.get('X-Metadata-Duration') || '?';
+                    const filesize = response.headers.get('X-Metadata-Size') || '?';
+                    const filename = response.headers.get('X-Metadata-Filename') || 'download.' + type;
 
+                    const blob = await response.blob();
                     const downloadUrl = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = downloadUrl;
@@ -370,12 +413,42 @@ app.get('/', (req, res) => {
 
                     loading.style.display = 'none';
                     
+                    // Ambil signature dari server
+                    const fileApi = await fetch('/api/files');
+                    const data = await fileApi.json();
+                    const globalSignature = data.signature || "${signature}";
+                    
                     successDiv.style.display = 'block';
                     successDiv.innerHTML = \`
                         <h3>✅ Download selesai!</h3>
-                        <div class="file-info">
-                            <p><strong>📁 File:</strong> \${filename}</p>
-                            <p><strong>🔗 Link:</strong> <a href="/get/\${encodeURIComponent(filename)}" target="_blank">/get/\${filename}</a></p>
+                        <div class="track-info">
+                            <div class="track-row">
+                                <span class="track-label">Judul</span>
+                                <span class="track-value">\${title}</span>
+                            </div>
+                            <div class="track-row">
+                                <span class="track-label">Artis</span>
+                                <span class="track-value">\${uploader}</span>
+                            </div>
+                            <div class="track-row">
+                                <span class="track-label">Album</span>
+                                <span class="track-value">\${uploader}</span>
+                            </div>
+                            <div class="track-row">
+                                <span class="track-label">Durasi</span>
+                                <span class="track-value">\${duration}</span>
+                            </div>
+                            <div class="track-row">
+                                <span class="track-label">Ukuran</span>
+                                <span class="track-value">\${filesize}</span>
+                            </div>
+                            <div class="track-row">
+                                <span class="track-label">Link</span>
+                                <span class="track-value">
+                                    <a href="/get/\${encodeURIComponent(filename)}" target="_blank">/get/\${filename}</a>
+                                    <span class="signature-text">\${globalSignature}</span>
+                                </span>
+                            </div>
                         </div>
                     \`;
 
@@ -383,7 +456,7 @@ app.get('/', (req, res) => {
 
                 } catch (err) {
                     loading.style.display = 'none';
-                    errorDiv.style.display = 'flex';
+                    errorDiv.style.display = 'block';
                     errorDiv.textContent = err.message;
                 }
             });
@@ -391,24 +464,35 @@ app.get('/', (req, res) => {
             async function loadFileList() {
                 try {
                     const response = await fetch('/api/files');
-                    const files = await response.json();
+                    const data = await response.json();
                     
+                    if (data.error) {
+                        fileListContainer.innerHTML = '<div class="empty-list">' + data.error + '</div>';
+                        return;
+                    }
+
+                    const files = data.files || [];
+                    const globalSignature = data.signature || "${signature}";
+
                     if (files.length === 0) {
                         fileListContainer.innerHTML = '<div class="empty-list">Belum ada file.</div>';
                         return;
                     }
 
                     let html = '<ul class="file-list">';
-                    files.slice(0, 10).forEach(file => {
+                    files.slice(0, 15).forEach(file => {
                         html += \`
                             <li class="file-item">
-                                <span class="file-name" title="\${file.name}">\${file.name}</span>
-                                <span class="file-size">\${file.size}</span>
-                                <a href="/get/\${encodeURIComponent(file.name)}" class="file-download" download>⬇️</a>
+                                <span class="file-title" title="\${file.title}">\${file.title}</span>
+                                <span class="file-artist">\${file.uploader}</span>
+                                <span class="file-album">\${file.album}</span>
+                                <span class="file-duration">\${file.duration}</span>
+                                <a href="\${file.url}" class="file-download" download>⬇️</a>
                             </li>
                         \`;
                     });
                     html += '</ul>';
+                    html += '<p style="text-align:right; color:#888; margin-top:10px;">' + globalSignature + '</p>';
                     fileListContainer.innerHTML = html;
                 } catch (err) {
                     fileListContainer.innerHTML = '<div class="empty-list">Gagal memuat daftar file.</div>';
@@ -430,20 +514,24 @@ app.post('/download', async (req, res) => {
     const outputTemplate = path.join(config.downloadDir, `dl_${timestamp}_${randomStr}_%(title)s.%(ext)s`);
 
     try {
+        // Ambil metadata video terlebih dahulu
         const infoCmd = `${config.ytdlBin} --dump-json --no-warnings ${config.cookiesFile ? `--cookies "${config.cookiesFile}"` : ''} --extractor-args "${config.ytExtractorArgs}" "${url}"`;
         const { stdout } = await execPromise(infoCmd);
         const info = JSON.parse(stdout);
-        const title = info.title;
-        const safeTitle = title.replace(/[^\w\s]/gi, '_').replace(/\s+/g, '_').substring(0, 100);
+        const title = info.title || 'Unknown';
+        const uploader = info.uploader || 'Unknown';
+        const duration = info.duration ? info.duration : 'N/A';
 
+        // Download file
         let downloadCmd = `${config.ytdlBin} --no-warnings ${config.cookiesFile ? `--cookies "${config.cookiesFile}"` : ''} --extractor-args "${config.ytExtractorArgs}" --restrict-filenames -o "${outputTemplate}" "${url}"`;
         if (type === 'mp3') {
-            downloadCmd += ` -x --audio-format mp3 --audio-quality 128K --ffmpeg-location "${config.ffmpegBin}"`;
+            downloadCmd += ` -x --audio-format mp3 --audio-quality 128K --ffmpeg-location "${config.ffmpegBin}" --embed-metadata --embed-thumbnail`;
         } else {
-            downloadCmd += ` -f mp4`;
+            downloadCmd += ` -f mp4 --embed-metadata`;
         }
         await execPromise(downloadCmd);
 
+        // Cari file hasil download
         const files = fs.readdirSync(config.downloadDir)
             .filter(f => f.includes(`dl_${timestamp}_${randomStr}`))
             .sort((a, b) => fs.statSync(path.join(config.downloadDir, b)).mtimeMs - fs.statSync(path.join(config.downloadDir, a)).mtimeMs);
@@ -452,8 +540,26 @@ app.post('/download', async (req, res) => {
 
         const fileName = files[0];
         const filePath = path.join(config.downloadDir, fileName);
+        const fileSize = fs.statSync(filePath).size;
 
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeTitle)}.${type}"`);
+        // Simpan metadata ke file .json
+        const metaPath = filePath + '.json';
+        const metadata = {
+            title,
+            uploader,
+            duration,
+            size: fileSize,
+            filename: fileName
+        };
+        fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2));
+
+        // Set header untuk metadata
+        res.setHeader('X-Metadata-Title', encodeURIComponent(title));
+        res.setHeader('X-Metadata-Uploader', encodeURIComponent(uploader));
+        res.setHeader('X-Metadata-Duration', formatDuration(duration));
+        res.setHeader('X-Metadata-Size', formatSize(fileSize));
+        res.setHeader('X-Metadata-Filename', encodeURIComponent(fileName));
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
         res.setHeader('Content-Type', type === 'mp3' ? 'audio/mpeg' : 'video/mp4');
 
         const fileStream = fs.createReadStream(filePath);
@@ -461,8 +567,12 @@ app.post('/download', async (req, res) => {
 
         fileStream.on('end', () => {
             setTimeout(() => {
+                // Hapus file utama dan metadata
                 fs.unlink(filePath, (err) => {
                     if (!err) console.log(`🗑️ File ${fileName} dihapus`);
+                });
+                fs.unlink(metaPath, (err) => {
+                    if (!err) console.log(`🗑️ Metadata ${fileName}.json dihapus`);
                 });
             }, config.autoDeleteDelay);
         });
@@ -501,4 +611,5 @@ app.get('/get/:filename', (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Web server berjalan di http://localhost:${PORT}`);
     console.log(`📁 Download folder: ${config.downloadDir}`);
+    console.log(`✍️ Signature: ${signature}`);
 });
