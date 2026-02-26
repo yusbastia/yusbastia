@@ -1,0 +1,496 @@
+package main
+
+import (
+	"crypto/rand"
+	"fmt"
+	"log"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
+	irc "github.com/thoj/go-ircevent"
+)
+
+// ==================== KONFIGURASI ====================
+const (
+	// Koneksi ZNC
+	zncHost      = "47.250.210.218"
+	zncPort      = "2030"
+	zncUsername  = "Admin"
+	zncNetwork   = "irchat"
+	zncPassword  = "solupa"
+
+	// Server IRC tujuan
+	ircServer    = "irchat.online"
+	ircPort      = "6667"
+
+	// Channel dan control panel
+	channel      = "#yobayat"
+	controlPanel = "*controlpanel"
+
+	// Informasi script
+	scriptName    = "FreeZNC management script"
+	scriptOwner   = "Lemon"
+	scriptOwnerMail = "yuslemon91@gmail.com"
+	scriptUpdater = "YUZU"
+	scriptVersion = "0.7.0.1 (Go port)"
+
+	// Realname default untuk user ZNC
+	defaultRealname = "12Y11 O00 B12 A11 Y00 A12 T"
+
+	// Prefix perintah
+	commandPrefix = "!"
+)
+
+// ==================== DATA DAN STATUS ====================
+// Daftar admin (nickname yang memiliki akses ke perintah admin)
+var adminList = map[string]bool{
+	"Lemon": true,
+}
+
+// Status online admin (untuk perintah .admins)
+var adminOnline = make(map[string]bool)
+var adminMutex sync.Mutex
+
+// Data user (disimpan di memori)
+type UserData struct {
+	Nick      string    // nick requester
+	Username  string
+	Password  string
+	Email     string
+	Status    string    // "pending", "confirmed", "denied"
+	CreatedAt time.Time
+}
+
+var users = make(map[string]*UserData) // key: username
+var usersMutex sync.Mutex
+
+// ==================== FUNGSI BANTU ====================
+func isAdmin(nick string) bool {
+	_, ok := adminList[nick]
+	return ok
+}
+
+// generatePassword membuat password acak (huruf+angka 12 karakter)
+func generatePassword() string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 12)
+	_, err := rand.Read(b)
+	if err != nil {
+		log.Fatal("Gagal generate password:", err)
+	}
+	for i := range b {
+		b[i] = charset[int(b[i])%len(charset)]
+	}
+	return string(b)
+}
+
+func isValidUsername(username string) bool {
+	match, _ := regexp.MatchString("^[a-zA-Z0-9_]+$", username)
+	return match
+}
+
+func isValidEmail(email string) bool {
+	// Sederhana: harus mengandung @ dan .
+	return strings.Contains(email, "@") && strings.Contains(email, ".")
+}
+
+// ==================== CLEANUP (hapus data kadaluarsa) ====================
+func cleanupOldData() {
+	for {
+		time.Sleep(10 * time.Minute)
+		usersMutex.Lock()
+		now := time.Now()
+		for uname, u := range users {
+			// Hapus pending/denied yang lebih dari 1 jam
+			if (u.Status == "pending" || u.Status == "denied") && now.Sub(u.CreatedAt) > 1*time.Hour {
+				log.Printf("Menghapus data user %s (kadaluarsa)", uname)
+				delete(users, uname)
+			}
+		}
+		usersMutex.Unlock()
+	}
+}
+
+// ==================== FUNGSI KIRIM PERINTAH KE ZNC ====================
+func sendToControlpanel(conn *irc.Connection, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	conn.Privmsg(controlPanel, msg)
+	time.Sleep(300 * time.Millisecond)
+}
+
+// ==================== MAIN ====================
+func main() {
+	loginString := fmt.Sprintf("%s/%s:%s", zncUsername, zncNetwork, zncPassword)
+
+	conn := irc.IRC("ZNC-Bot", "ZNC-Bot")
+	conn.Password = loginString
+	conn.Debug = true
+	conn.UseTLS = false
+	conn.Timeout = 10 * time.Second
+	conn.Version = scriptName + " " + scriptVersion
+	conn.RealName = "\x0304" + scriptOwner + "\x03"
+
+	conn.AddCallback("001", func(e *irc.Event) {
+		log.Println("Login berhasil, join channel", channel)
+		conn.Join(channel)
+	})
+
+	// ========== CALLBACK UTAMA ==========
+	conn.AddCallback("PRIVMSG", func(e *irc.Event) {
+		sender := e.Nick
+		msg := e.Message()
+		target := e.Arguments[0]
+		isChannel := strings.HasPrefix(target, "#")
+
+		// Abaikan pesan dari diri sendiri
+		if sender == conn.GetNick() {
+			return
+		}
+
+		log.Printf("Pesan dari %s ke %s: %s", sender, target, msg)
+
+		// Perintah hanya diproses jika diawali prefix
+		if !strings.HasPrefix(msg, commandPrefix) {
+			return
+		}
+		parts := strings.Fields(msg)
+		if len(parts) == 0 {
+			return
+		}
+		cmd := strings.ToLower(parts[0][1:]) // tanpa prefix
+		args := parts[1:]
+
+		// ========== PERINTAH ==========
+		switch cmd {
+		// ---------- User ----------
+		case "request":
+			if len(args) < 2 {
+				conn.Privmsg(target, fmt.Sprintf("Format: %srequest <username> <email>", commandPrefix))
+				return
+			}
+			username := args[0]
+			email := args[1]
+			if !isValidUsername(username) {
+				conn.Privmsg(target, "Username hanya boleh huruf, angka, dan underscore.")
+				return
+			}
+			if !isValidEmail(email) {
+				conn.Privmsg(target, "Email tidak valid.")
+				return
+			}
+
+			usersMutex.Lock()
+			_, exists := users[username]
+			if exists {
+				usersMutex.Unlock()
+				conn.Privmsg(target, fmt.Sprintf("Username %s sudah pernah digunakan.", username))
+				return
+			}
+
+			// Buat data user baru
+			u := &UserData{
+				Nick:      sender,
+				Username:  username,
+				Password:  generatePassword(),
+				Email:     email,
+				Status:    "pending",
+				CreatedAt: time.Now(),
+			}
+			users[username] = u
+			usersMutex.Unlock()
+
+			// Beri tahu user
+			reply := fmt.Sprintf("%s: Permintaan akun untuk %s telah diterima. Menunggu konfirmasi admin.", sender, username)
+			conn.Privmsg(target, reply)
+
+		// ---------- Admin Only ----------
+		case "listunconfirmed", "luu":
+			if !isAdmin(sender) {
+				conn.Privmsg(target, "Maaf, perintah ini hanya untuk admin.")
+				return
+			}
+			usersMutex.Lock()
+			var pending []string
+			for uname, u := range users {
+				if u.Status == "pending" {
+					pending = append(pending, fmt.Sprintf("%s (%s)", uname, u.Email))
+				}
+			}
+			usersMutex.Unlock()
+			if len(pending) == 0 {
+				conn.Privmsg(target, "Tidak ada user yang menunggu konfirmasi.")
+			} else {
+				conn.Privmsg(target, "User pending: "+strings.Join(pending, ", "))
+			}
+
+		case "confirm":
+			if !isAdmin(sender) {
+				conn.Privmsg(target, "Maaf, perintah ini hanya untuk admin.")
+				return
+			}
+			if len(args) < 1 {
+				conn.Privmsg(target, fmt.Sprintf("Format: %sconfirm <username>", commandPrefix))
+				return
+			}
+			username := args[0]
+
+			usersMutex.Lock()
+			u, exists := users[username]
+			if !exists || u.Status != "pending" {
+				usersMutex.Unlock()
+				conn.Privmsg(target, fmt.Sprintf("User %s tidak ditemukan atau sudah diproses.", username))
+				return
+			}
+
+			// Kirim perintah ke controlpanel
+			sendToControlpanel(conn, "adduser %s %s", username, u.Password)
+			sendToControlpanel(conn, "addnetwork %s %s", username, zncNetwork)
+			sendToControlpanel(conn, "addserver %s %s %s %s", username, zncNetwork, ircServer, ircPort)
+			sendToControlpanel(conn, "addchan %s %s %s", username, zncNetwork, channel)
+			sendToControlpanel(conn, "Set realname %s %s", username, defaultRealname)
+			sendToControlpanel(conn, "reconnect %s %s", username, zncNetwork)
+
+			// Kirim detail ke user via PM
+			conn.Privmsg(u.Nick, "Akun ZNC Anda telah dikonfirmasi dan berhasil dibuat.")
+			conn.Privmsg(u.Nick, fmt.Sprintf("Username: %s", u.Username))
+			conn.Privmsg(u.Nick, fmt.Sprintf("Password: %s", u.Password))
+			conn.Privmsg(u.Nick, fmt.Sprintf("Server ZNC: %s", zncHost))
+			conn.Privmsg(u.Nick, fmt.Sprintf("Port ZNC: %s", zncPort))
+			conn.Privmsg(u.Nick, fmt.Sprintf("Network: %s", zncNetwork))
+			conn.Privmsg(u.Nick, fmt.Sprintf("Gunakan format username: %s/%s", u.Username, zncNetwork))
+			conn.Privmsg(u.Nick, "Setelah login, Anda akan otomatis terhubung ke "+ircServer+":"+ircPort+" dan join "+channel)
+
+			// Ubah status user menjadi confirmed
+			u.Status = "confirmed"
+			users[username] = u
+			usersMutex.Unlock()
+
+			conn.Privmsg(target, fmt.Sprintf("User %s telah dikonfirmasi.", username))
+
+		case "deny":
+			if !isAdmin(sender) {
+				conn.Privmsg(target, "Maaf, perintah ini hanya untuk admin.")
+				return
+			}
+			if len(args) < 1 {
+				conn.Privmsg(target, fmt.Sprintf("Format: %sdeny <username>", commandPrefix))
+				return
+			}
+			username := args[0]
+
+			usersMutex.Lock()
+			u, exists := users[username]
+			if !exists || u.Status != "pending" {
+				usersMutex.Unlock()
+				conn.Privmsg(target, fmt.Sprintf("User %s tidak ditemukan atau sudah diproses.", username))
+				return
+			}
+			// Hapus data
+			delete(users, username)
+			usersMutex.Unlock()
+
+			// Beri tahu user (jika masih online)
+			conn.Privmsg(u.Nick, fmt.Sprintf("Maaf, permintaan akun ZNC Anda (%s) ditolak oleh admin.", username))
+			conn.Privmsg(target, fmt.Sprintf("User %s telah ditolak.", username))
+
+		case "chemail":
+			if !isAdmin(sender) {
+				conn.Privmsg(target, "Maaf, perintah ini hanya untuk admin.")
+				return
+			}
+			if len(args) < 2 {
+				conn.Privmsg(target, fmt.Sprintf("Format: %schemail <username> <email>", commandPrefix))
+				return
+			}
+			username := args[0]
+			email := args[1]
+			if !isValidEmail(email) {
+				conn.Privmsg(target, "Email tidak valid.")
+				return
+			}
+
+			usersMutex.Lock()
+			u, exists := users[username]
+			if !exists {
+				usersMutex.Unlock()
+				conn.Privmsg(target, fmt.Sprintf("User %s tidak ditemukan.", username))
+				return
+			}
+			u.Email = email
+			users[username] = u
+			usersMutex.Unlock()
+
+			conn.Privmsg(target, fmt.Sprintf("Email untuk %s telah diubah menjadi %s.", username, email))
+
+		case "addvhost":
+			if !isAdmin(sender) {
+				conn.Privmsg(target, "Maaf, perintah ini hanya untuk admin.")
+				return
+			}
+			if len(args) < 2 {
+				conn.Privmsg(target, fmt.Sprintf("Format: %saddvhost <username> <vhost>", commandPrefix))
+				return
+			}
+			username := args[0]
+			vhost := args[1]
+
+			sendToControlpanel(conn, "Set bindhost %s %s", username, vhost)
+			sendToControlpanel(conn, "reconnect %s %s", username, zncNetwork)
+			conn.Privmsg(target, fmt.Sprintf("Perintah set vhost untuk %s menjadi %s telah dikirim.", username, vhost))
+
+		case "chpass", "resetpass":
+			if !isAdmin(sender) {
+				conn.Privmsg(target, "Maaf, perintah ini hanya untuk admin.")
+				return
+			}
+			if len(args) < 1 {
+				conn.Privmsg(target, fmt.Sprintf("Format: %schpass <username> [newpassword]", commandPrefix))
+				return
+			}
+			username := args[0]
+			newPass := ""
+			if len(args) >= 2 {
+				newPass = args[1]
+			} else {
+				newPass = generatePassword()
+			}
+
+			sendToControlpanel(conn, "Set password %s %s", username, newPass)
+
+			usersMutex.Lock()
+			if u, ok := users[username]; ok {
+				u.Password = newPass
+				users[username] = u
+			}
+			usersMutex.Unlock()
+
+			conn.Privmsg(target, fmt.Sprintf("Password untuk %s telah direset. Cek PM untuk password baru.", username))
+			conn.Privmsg(sender, fmt.Sprintf("Password baru untuk %s: %s", username, newPass))
+
+		case "deluser":
+			if !isAdmin(sender) {
+				conn.Privmsg(target, "Maaf, perintah ini hanya untuk admin.")
+				return
+			}
+			if len(args) < 1 {
+				conn.Privmsg(target, fmt.Sprintf("Format: %sdeluser <username>", commandPrefix))
+				return
+			}
+			username := args[0]
+
+			sendToControlpanel(conn, "deluser %s", username)
+
+			usersMutex.Lock()
+			delete(users, username)
+			usersMutex.Unlock()
+
+			conn.Privmsg(target, fmt.Sprintf("User %s telah dihapus dari ZNC.", username))
+
+		case "noidle":
+			if !isAdmin(sender) {
+				conn.Privmsg(target, "Maaf, perintah ini hanya untuk admin.")
+				return
+			}
+			if len(args) < 1 {
+				conn.Privmsg(target, fmt.Sprintf("Format: %snoidle <username>", commandPrefix))
+				return
+			}
+			username := args[0]
+			sendToControlpanel(conn, "deluser %s", username)
+			usersMutex.Lock()
+			delete(users, username)
+			usersMutex.Unlock()
+			conn.Privmsg(target, fmt.Sprintf("User %s telah dihapus karena idle (simulasi).", username))
+
+		case "lastseen":
+			if !isAdmin(sender) {
+				conn.Privmsg(target, "Maaf, perintah ini hanya untuk admin.")
+				return
+			}
+			if len(args) < 1 {
+				conn.Privmsg(target, fmt.Sprintf("Format: %slastseen <username>", commandPrefix))
+				return
+			}
+			username := args[0]
+			conn.Privmsg("*lastseen", "show "+username)
+			conn.Privmsg(target, fmt.Sprintf("Permintaan lastseen untuk %s telah dikirim.", username))
+
+		case "admins":
+			adminMutex.Lock()
+			var online []string
+			for nick, onlineStatus := range adminOnline {
+				if onlineStatus {
+					online = append(online, nick)
+				}
+			}
+			adminMutex.Unlock()
+			if len(online) == 0 {
+				conn.Privmsg(target, "Tidak ada admin yang online saat ini.")
+			} else {
+				conn.Privmsg(target, "Admin online: "+strings.Join(online, ", "))
+			}
+
+		case "online":
+			if !isAdmin(sender) {
+				conn.Privmsg(target, "Maaf, perintah ini hanya untuk admin.")
+				return
+			}
+			adminMutex.Lock()
+			adminOnline[sender] = true
+			adminMutex.Unlock()
+			conn.Privmsg(target, fmt.Sprintf("%s sekarang ditandai ONLINE.", sender))
+
+		case "offline":
+			if !isAdmin(sender) {
+				conn.Privmsg(target, "Maaf, perintah ini hanya untuk admin.")
+				return
+			}
+			adminMutex.Lock()
+			adminOnline[sender] = false
+			adminMutex.Unlock()
+			conn.Privmsg(target, fmt.Sprintf("%s sekarang ditandai OFFLINE.", sender))
+
+		case "version":
+			conn.Privmsg(target, fmt.Sprintf("%s versi %s oleh %s (diperbarui oleh %s)", scriptName, scriptVersion, scriptOwner, scriptUpdater))
+
+		case "help":
+			if len(args) > 0 {
+				sub := args[0]
+				conn.Privmsg(sender, fmt.Sprintf("Bantuan untuk %s%s", commandPrefix, sub))
+				conn.Privmsg(sender, "Silakan cek dokumentasi atau hubungi admin.")
+			} else {
+				if isChannel {
+					conn.Privmsg(sender, "Perintah umum: !request <username> <email> - Request akun ZNC")
+					conn.Privmsg(sender, "Perintah admin: !listunconfirmed, !confirm, !deny, !chemail, !addvhost, !chpass, !deluser, !noidle, !lastseen, !admins, !online, !offline, !version")
+					conn.Privmsg(sender, "Gunakan !help <perintah> untuk detail.")
+					conn.Privmsg(target, fmt.Sprintf("%s: Cek PM untuk bantuan.", sender))
+				} else {
+					conn.Privmsg(target, "Perintah umum: !request <username> <email>")
+					conn.Privmsg(target, "Perintah admin: !listunconfirmed, !confirm, !deny, !chemail, !addvhost, !chpass, !deluser, !noidle, !lastseen, !admins, !online, !offline, !version")
+				}
+			}
+
+		default:
+			conn.Privmsg(target, fmt.Sprintf("Perintah tidak dikenal. Ketik %shelp untuk bantuan.", commandPrefix))
+		}
+	})
+
+	// Jalankan pembersih data kadaluarsa
+	go cleanupOldData()
+
+	// Loop reconnect otomatis
+	for {
+		err := conn.Connect(zncHost + ":" + zncPort)
+		if err != nil {
+			log.Println("Gagal connect:", err)
+			time.Sleep(10 * time.Second)
+			continue
+		}
+		log.Println("Terhubung, memulai loop...")
+		conn.Loop()
+		log.Println("Koneksi terputus, mencoba reconnect dalam 10 detik...")
+		time.Sleep(10 * time.Second)
+	}
+}
