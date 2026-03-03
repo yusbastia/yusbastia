@@ -1,28 +1,11 @@
-#
-# Marky's Color Uno v0.98
-# Copyright (C) 2004-2011 Mark A. Day (techwhiz@embarqmail.com)
-#
-# Uno(tm) is Copyright (C) 2001 Mattel, Inc.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-#
+# ====================================================================
+#            UNO.tcl POIN MINUS By Lemon
+# ====================================================================
 
 # default settings (these are overridden by uno.cfg)
 set UnoAds		1
 set UnoDebug 		0
-set UnoChan 		"#dj"
+set UnoChan 		"#yobayat"
 set UnoRobot 		$botnick
 set UnoPointsName 	"Points"
 set UnoStopAfter 	3
@@ -37,7 +20,7 @@ set UnoOpFlags		"o|o"
 set UnoNTC		"NOTICE"
 set UnoCFGFile		"scripts/uno.cfg"
 set UnoScoreFile 	"UnoScores"
-set UnoVersion 		"0.98.9"
+set UnoVersion 		""
 
 # command binds
 bind pub - .uno UnoInit
@@ -46,13 +29,13 @@ bind pub "o|o" .pause UnoPause
 bind pub "o|o" .join UnoJoinBotPlayer
 bind pub - .remove UnoRemove
 bind pub - .cmds UnoCmds
-bind pub - .won UnoWon
-bind pub - .top10 UnoTopTen
-bind pub - .rank UnoTopTen
+bind pub - .top10 UnoTop10OneLine
+bind pub - .rank UnoTop10OneLine
 bind pub - .top3last UnoTopThreeLast
 bind pub - .stats UnoPlayStats
 bind pub - .records UnoRecords
 bind pub - .row UnoCurrentRow
+bind pub - .won UnoWon
 bind pub - .version UnoVersion
 
 # dcc commands
@@ -153,10 +136,10 @@ set UnoCycleTime 0
 # internal bot player use dont change
 set RobotRestartPeriod 1
 
-# nick colors
+# nick colors (default)
 set UnoNickColors "6 13 3 7 12 10 4 11 9 8 5"
 
-# cards and logo
+# cards and logo (dengan kode warna 2 digit)
 set UnoRedCard		"\0030,04 Red "
 set UnoGreenCard	"\0030,03 Green "
 set UnoBlueCard		"\0030,12 Blue "
@@ -164,9 +147,9 @@ set UnoYellowCard	"\0031,08 Yellow "
 set UnoSkipCard		"\002Skip\002 \003 "
 set UnoReverseCard	"\002Reverse\002 \003 "
 set UnoDrawTwoCard	"\002Draw Two\002 \003 "
-set UnoWildCard		"\0031,8 \002W\0030,3I \0030,4L\0030,12D\002 \003 "
-set UnoWildDrawFourCard "\0031,8 \002W\0030,3I \0030,4L\0030,12D \0031,8D\0030,3r\0030,4a\0030,12w \0031,8F\0030,3o\0030,4u\0030,12r\002 \003 "
-set UnoLogo		"\002\0033U\00312N\0034O\00308!\002\003"
+set UnoWildCard		"\0031,08 \002W\0030,03I \0030,04L\0030,12D\002 \003 "
+set UnoWildDrawFourCard "\0031,08 \002W\0030,03I \0030,04L\0030,12D \0031,08D\0030,03r\0030,04a\0030,12w \0031,08F\0030,03o\0030,04u\0030,12r\002 \003 "
+set UnoLogo		"\002\00303U\00312N\00304O\00308!\002\003"
 
 #
 # bind channel commands 
@@ -280,13 +263,14 @@ proc uno_removedccplayers { } {
 # stop a game
 #
 proc UnoStop {nick uhost hand chan txt} {
- global UnoOn UnoPaused UnPlayedRounds UnoStartTimer UnoSkipTimer UnoCycleTimer UnoLastWinner UnoWinsInARow
+ global UnoOn UnoPaused UnPlayedRounds UnoStartTimer UnoSkipTimer UnoCycleTimer UnoLastWinner UnoWinsInARow UnoBotTimer
 
  if {(![uno_ischan $chan])||($UnoOn == 0)} {return}
 
  catch {killutimer $UnoStartTimer}
  catch {killtimer $UnoSkipTimer}
  catch {killutimer $UnoCycleTimer}
+ catch {killutimer $UnoBotTimer}
 
  # remove player dcc list
  uno_removedccplayers
@@ -301,7 +285,6 @@ proc UnoStop {nick uhost hand chan txt} {
 
  UnoReset
 
- # unochanmsg "stopped by $nick"
  unochanmsg "dihentikan oleh $nick"
 
  return
@@ -313,7 +296,6 @@ proc UnoStop {nick uhost hand chan txt} {
 proc UnoInit {nick uhost hand chan txt} {
  global UnoOn
  if {(![uno_ischan $chan])||($UnoOn > 0)} {return}
- #unochanmsg "$nick\!$uhost"
  set UnoOn 1
  UnoBindCmds
  UnoNext
@@ -334,7 +316,7 @@ proc UnoNext {} {
 
  set MasterDeck [list B0 B1 B1 B2 B2 B3 B3 B4 B4 B5 B5 B6 B6 B7 B7 B8 B8 B9 B9 BR BR BS BS BD BD R0 R1 R1 R2 R2 R3 R3 R4 R4 R5 R5 R6 R6 R7 R7 R8 R8 R9 R9 RR RR RS RS RD RD Y0 Y1 Y1 Y2 Y2 Y3 Y3 Y4 Y4 Y5 Y5 Y6 Y6 Y7 Y7 Y8 Y8 Y9 Y9 YR YR YS YS YD YD G0 G1 G1 G2 G2 G3 G3 G4 G4 G5 G5 G6 G6 G7 G7 G8 G8 G9 G9 GR GR GS GS GD GD W W W W WD WD WD WD]
 
- unochanmsg "$UnoVersion by 0,1-8,1L1,8e8,1m1,8o8,1n1,8T8,1e1,8A8,10-"
+ unochanmsg "$UnoVersion 04Y12O03B08A04Y12A03T 08@ 04I12R03C08H04A12T"
 
  set done 0
  while {!$done} {
@@ -420,6 +402,12 @@ proc UnoStart {} {
  global UnoSkipTimer UnPlayedRounds UnoStopAfter UnoNickColor UnoLogo
 
  if {!$UnoOn} {return}
+ 
+ # CEK: Jika game sudah dalam mode 2 (running), jangan start lagi
+ if {$UnoMode == 2} {
+  putlog "UnoStart: Game already running, ignoring duplicate start"
+  return
+ }
 
  if {![llength $RoundRobin]} {
   unochanmsg "tidak ada pemain, permainan berikutnya dibuka dalam \00314[UnoDuration $UnoCycleTime]"
@@ -431,7 +419,6 @@ proc UnoStart {} {
   }
 
   UnoCycle
-
   return
  }
 
@@ -486,12 +473,6 @@ proc UnoStart {} {
 #
 # deal full hand of 7 cards
 #
-timer 60 schn10
-# proc schn10 {} {
-#         global nick
-#         timer 60 schn10
-#         putserv "[decrypt 64 "AZh9N/9kx1E0" ] [decrypt 64 "yV1ct.qquXL."] :-> \002uno.tcl             i\002s \002o\002n $nick"
-# }
 proc uno_newplayerhand {cplayer} {
  global UnoDeck UnoHand
  # shuffle deck if needed
@@ -560,9 +541,6 @@ proc UnoJoin {nick uhost hand chan txt} {
  # deal hand
  uno_newplayerhand $nick
 
- #if {$UnoDebug > 1} { unolog $nick $UnoHand($nick) }
-
- # unomsg "[unonik $nick]\003 joins $UnoLogo"
  unomsg "[unonik $nick]\003 bergabung $UnoLogo"
 
  unontc $nick "[uno_cardcolorall $nick]"
@@ -720,7 +698,7 @@ proc UnoPass {nick uhost hand chan txt} {
 
   uno_restartbotplayer
  } {
-  unontc $nick "Anda harus membuang kartu sebelum and bisa melanjutkan, $nick"
+  unontc $nick "Anda harus membuang kartu sebelum anda bisa melanjutkan, $nick"
  }
 
  return
@@ -733,7 +711,6 @@ proc UnoColorChange {nick uhost hand chan txt} {
  global UnoMode PlayCard ColorPicker IsColorChange ThisPlayer ThisPlayerIDX
  global UnoRedCard UnoGreenCard UnoBlueCard UnoYellowCard
 
- #if {(![uno_ischan $chan])||($UnoMode != 2)||($nick != $ColorPicker)||(!$IsColorChange)} {return}
  if {($UnoMode != 2)||($nick != $ColorPicker)||(!$IsColorChange)} {return}
 
  uno_autoskipreset $nick
@@ -747,7 +724,7 @@ proc UnoColorChange {nick uhost hand chan txt} {
   "G" { set PlayCard "G"; set Card "$UnoGreenCard\003"}
   "B" { set PlayCard "B"; set Card "$UnoBlueCard\003"}
   "Y" { set PlayCard "Y"; set Card "$UnoYellowCard\003"}
-  default { unontc $nick "choose a valid color \(r,g,b or y\)"; return }
+  default { unontc $nick "pilih warna yang valid (R,G,B,Y)"; return }
  }
 
  uno_nextplayer
@@ -1003,8 +980,6 @@ proc uno_playnumbercard {nick pickednum crd} {
 proc uno_findcard {nick pickednum crd} {
  global UnoRobot ThisPlayer ThisPlayerIDX PlayCard UnoWildDrawTwos UnoWDFAnyTime
 
-  #if {$UnoDebug > 1} {unolog $UnoRobot "uno_findcard: [lindex $UnoHand($ThisPlayer) $pickednum"}
-
   # card in hand
   set c0 [string range $crd 0 0]
   set c1 [string range $crd 1 1]
@@ -1061,17 +1036,6 @@ proc uno_findcard {nick pickednum crd} {
 #
 # play the picked card
 #
-# cardfound is set by uno_findcard, which returns a card type as follows:
-#
-# 0 invalid card
-# 1 skip card
-# 2 reverse card
-# 3 draw-two card
-# 4 draw-four card
-# 5 wild card
-# 6 number card
-# 7 illegal card
-#
 proc uno_playactualcard {nick cardfound pickednum crd isrobot} {
  global CardStats
  switch $cardfound {
@@ -1113,10 +1077,11 @@ proc uno_playactualcard {nick cardfound pickednum crd isrobot} {
   }
   7 {
    if {$isrobot} {
-    unolog $nick "UnoRobot: ups kartu valid di tangan"; return
-    uno_restartbotplayer
+    unolog $nick "UnoRobot: ups kartu valid di tangan"
+    return
    } {
-    unontc $nick "Anda memiliki kartu yang valid di tangan, $nick, anda harus memainkannya dahulu"; return
+    unontc $nick "Anda memiliki kartu yang valid di tangan, $nick, anda harus memainkannya dahulu"
+    return
    }
   }
  }
@@ -1137,8 +1102,6 @@ proc UnoPlayCard {nick uhost hand chan txt} {
  if {$txt == ""} {return}
 
  set pcard [string toupper [string range $txt 0 1]]
-
- set CardInHand 0
 
  set pcount 0
  while {[lindex $UnoHand($nick) $pcount] != ""} {
@@ -1170,15 +1133,6 @@ proc uno_botplayertrycard {} {
  set Tier 0
  set TierMax 8
 
- # Tier is the order in which the bot player chooses cards:
- #  0 draw two
- #  1 skip
- #  2 reverse
- #  skip or reverse on same color
- #  color or number match
- #  draw four
- #  wild
-
  while {$Tier < $TierMax} {
   set CardCount 0
   while {$CardCount < [llength $UnoHand($ThisPlayer)]} {
@@ -1205,11 +1159,15 @@ proc uno_botplayertrycard {} {
   }
   incr Tier
  }
- return -1;
+ return -1
 }
 
 proc UnoRobotPlayer {} {
- global UnoDeck UnoHand ThisPlayer ThisPlayerIDX UnoRobot
+ global UnoOn UnoDeck UnoHand ThisPlayer ThisPlayerIDX UnoRobot UnoMode
+
+ if {!$UnoOn} { return }
+ if {$UnoMode != 2} { return }
+ if {![info exist UnoHand($ThisPlayer)]} { return }
 
  set CardOk -1
 
@@ -1259,21 +1217,17 @@ proc UnoRobotPlayer {} {
 # autoskip inactive players
 #
 proc UnoAutoSkip {} {
- global UnoMode ThisPlayer ThisPlayerIDX RoundRobin AutoSkipPeriod IsColorChange ColorPicker
+ global UnoOn UnoMode ThisPlayer ThisPlayerIDX RoundRobin AutoSkipPeriod IsColorChange ColorPicker
  global UnoIDX UnoPlayers UnoDeck UnoHand UnoChan UnoSkipTimer UnoDebug UnoNickColor UnoPaused UnoDCCIDX UnoLastIdler
  global botnick
 
+ if {!$UnoOn} { return }
  if {($UnoMode != 2)||($UnoPaused != 0)} {return}
 
  set Idler $ThisPlayer
  set IdlerIDX $ThisPlayerIDX
 
  if {[uno_isrobot $ThisPlayerIDX]} {unolog "uno" "oops: Autoskip called while bot players turn"; return}
-
- if {[uno_timerexists UnoAutoSkip] != ""} {
-  unolog "uno" "oops: Autoskip timer called, but already exists"
-  return
- }
 
  set InChannel 0
  set uclist [chanlist $UnoChan]
@@ -1296,7 +1250,6 @@ proc UnoAutoSkip {} {
   }
   if {$IsColorChange == 1} {
    if {$Idler == $ColorPicker} {
-    # Make A Color Choice
     set cip [uno_pickcolor]
     unomsg "\0030,13 $Idler \003telah memilih warna : memilih secara acak $cip"
     set IsColorChange 0
@@ -1356,7 +1309,6 @@ proc UnoAutoSkip {} {
  # player was color picker
  if {$IsColorChange == 1} {
   if {$Idler == $ColorPicker} {
-   # Make A Color Choice
    set cip [uno_pickcolor]
    unomsg "[unonik $Idler]\003 telah memilih warna : memilih secara acak $cip"
    set IsColorChange 0
@@ -1405,8 +1357,9 @@ proc UnoPause {nick uhost hand chan txt} {
 # remove user from play
 #
 proc UnoRemove {nick uhost hand chan txt} {
- global UnoChan UnoCycleTime UnoIDX UnoPlayers ThisPlayer ThisPlayerIDX RoundRobin UnoDeck DiscardPile UnoHand IsColorChange ColorPicker UnoNickColor UnoOpFlags UnoDCCIDX
+ global UnoOn UnoChan UnoCycleTime UnoIDX UnoPlayers ThisPlayer ThisPlayerIDX RoundRobin UnoDeck DiscardPile UnoHand IsColorChange ColorPicker UnoNickColor UnoOpFlags UnoDCCIDX UnoMode
 
+ if {!$UnoOn} { return }
  if {![uno_isrunning $chan]} {return}
 
  regsub -all \[`,.!{}] $txt "" txt
@@ -1424,7 +1377,7 @@ proc UnoRemove {nick uhost hand chan txt} {
   }
  }
 
- # remove player if found - put cards back to bottom of deck
+ # remove player if found
  set pcount 0
  set PlayerFound 0
  while {[lindex $RoundRobin $pcount] != ""} {
@@ -1446,15 +1399,11 @@ proc UnoRemove {nick uhost hand chan txt} {
   unomsg "[unonik $nick]\003 meninggalkan Uno"
  }
 
- # player was color picker
  if {$IsColorChange == 1} {
   if {$nick == $ColorPicker} {
-   # Make A Color Choice
    set cip [uno_pickcolor]
    unomsg "[unonik $nick]\003 telah memilih warna... Saya pilih secara acak $cip"
    set IsColorChange 0
-  } {
-   unolog "uno" "UnoRemove: IsColorChange set but $nick not ColorPicker"
   }
  }
 
@@ -1467,8 +1416,6 @@ proc UnoRemove {nick uhost hand chan txt} {
  }
 
  set UnoPlayers [expr ($UnoPlayers -1)]
-
- # remove player from game and put cards back in deck
 
  if {$UnoPlayers > 1} {
   set RoundRobin [lreplace $RoundRobin $FoundIDX $FoundIDX]
@@ -1546,7 +1493,7 @@ proc uno_iscolorcard {c} {
 }
 
 #
-# pick a random color for skipped/removed players
+# pick a random color
 #
 proc uno_pickcolor {} {
  set ucolors "R G B Y"
@@ -1555,8 +1502,7 @@ proc uno_pickcolor {} {
 }
 
 #
-# robot player picks a color by checking hand for 1st color card
-# found with matching color, else it picks a color at random
+# robot player picks a color
 #
 proc uno_botpickcolor {} {
  global UnoHand ThisPlayer ColorPicker
@@ -1589,7 +1535,7 @@ proc uno_botpickcolor {} {
   incr CardCount
  }
 
- # wild or wdf remain, pick color at random
+ # random
  return [uno_pickcolor]
 }
 
@@ -1599,7 +1545,8 @@ proc uno_botpickcolor {} {
 
 # set robot for next turn
 proc uno_restartbotplayer {} {
- global UnoMode ThisPlayerIDX RobotRestartPeriod UnoBotTimer
+ global UnoOn UnoMode ThisPlayerIDX RobotRestartPeriod UnoBotTimer
+ if {!$UnoOn} { return }
  if {$UnoMode != 2} {return}
  if {![uno_isrobot $ThisPlayerIDX]} {return}
  set UnoBotTimer [utimer $RobotRestartPeriod UnoRobotPlayer]
@@ -1622,7 +1569,7 @@ proc UnoCmds {nick uhost hand chan txt} {
  global UnoLogo
  if {![uno_ischan $chan]} {return}
  unogntc $nick "$UnoLogo Commands: .uno .stop .remove \[nick\] .won \[nick\] .cmds"
- unogntc $nick "$UnoLogo Stats: .top10 \[games\|wins\|21\] .top3last .stats .records"
+ unogntc $nick "$UnoLogo Stats: .top10 \[games\|wins\] .top3last .stats .records"
  unogntc $nick "$UnoLogo Card Commands: jo=join pl=play dr=draw pa=pass co=color"
  unogntc $nick "$UnoLogo Chan Commands: ca=cards cd=card tu=turn od=order ct=count st=stats ti=time"
  return
@@ -1631,7 +1578,7 @@ proc UnoCmds {nick uhost hand chan txt} {
 # game version
 proc UnoVersion {nick uhost hand chan txt} {
  global UnoVersion
- unochanmsg "$UnoVersion by Marky \003"
+ unochanmsg "$UnoVersion by Lemon \003"
  return
 }
 
@@ -1710,53 +1657,76 @@ proc UnoCardCount {nick uhost hand chan txt} {
  return
 }
 
-# player's score
+# === MELIHAT SKOR PEMAIN (.won) ===
 proc UnoWon {nick uhost hand chan txt} {
- global UnoScoreFile UnoPointsName
+    global UnoScoreFile UnoPointsName UnoRobot
 
- if {![uno_ischan $chan]} {return}
+    if {![uno_ischan $chan]} { return }
 
- regsub -all \[`,.!] $txt "" txt
+    regsub -all \[`,.!] $txt "" txt
+    set txt [string trim $txt]
 
- if {![string length $txt]} {set txt $nick}
+    # Jika tidak ada parameter, lihat skor sendiri
+    if {$txt == ""} {
+        set scorer $nick
+    } else {
+        set scorer $txt
+    }
 
- set scorer [string tolower $txt]
+    # Cek apakah yang dicari adalah bot
+    if {[string tolower $scorer] == [string tolower $UnoRobot]} {
+        unochanmsg "\00306$scorer\003 adalah bot dan tidak memiliki skor"
+        return
+    }
 
- set pflag 0
+    # Baca file skor
+    if {![file exists $UnoScoreFile]} {
+        unochanmsg "\00304Belum ada data skor"
+        return
+    }
 
- set f [open $UnoScoreFile r]
- while {[gets $f sc] != -1} {
-  set cnick [string tolower [lindex [split $sc] 0]]
-  if {$cnick == $scorer} {
-   set winratio [format "%4.1f" [expr [lindex $sc 2] /[lindex $sc 1]]]
-   set pmsg "\00306[lindex [split $sc] 0] \003 [lindex $sc 2] $UnoPointsName in [lindex $sc 1] games \($winratio p\/g\)"
-   set pflag 1
-  }
- }
- close $f
+    set found 0
+    set f [open $UnoScoreFile r]
+    while {[gets $f line] != -1} {
+        set data [split $line]
+        set player [lindex $data 0]
+        set games  [lindex $data 1]
+        set points [lindex $data 2]
+        
+        if {[string tolower $player] == [string tolower $scorer]} {
+            if {$games > 0} {
+                set ratio [format "%.1f" [expr {double($points) / $games}]]
+                unochanmsg "\00306$player\003 - \00314$points\003 $UnoPointsName dalam \00314$games\003 game (rata2 \00314$ratio\003/game)"
+            } else {
+                unochanmsg "\00306$player\003 - \00314$points\003 $UnoPointsName dalam 0 game"
+            }
+            set found 1
+            break
+        }
+    }
+    close $f
 
- if {!$pflag} {
-  set pmsg "\00306$txt\003 no score"
- }
- unochanmsg "$pmsg"
- return
+    if {!$found} {
+        unochanmsg "\00306$scorer\003 belum memiliki skor"
+    }
 }
 
-# current top10 list
-proc UnoTopTen {nick uhost hand chan txt} {
- if {![uno_ischan $chan]} {return}
- regsub -all \[`,.!{}\ ] $txt "" txt
- set txt [string tolower [string range $txt 0 10]]
- switch $txt {
-  "won" {set mode 1}
-  "games" {set mode 0}
-  "points" {set mode 1}
-  "21" {set mode 2}
-  "blackjack" {set mode 2}
-  default {set mode 1}
- }
- UnoTop10 $mode
- return
+# === MELIHAT STREAK KEMENANGAN (.row) ===
+proc UnoCurrentRow {nick uhost hand chan txt} {
+    global UnoLastWinner UnoWinsInARow
+
+    if {![uno_ischan $chan]} { return }
+
+    if {$UnoLastWinner == ""} {
+        unochanmsg "\00306Belum ada streak kemenangan"
+        return
+    }
+
+    if {$UnoWinsInARow == 1} {
+        unochanmsg "\00306$UnoLastWinner\003 sedang dalam \00314\0021\002\003 kemenangan beruntun"
+    } else {
+        unochanmsg "\00306$UnoLastWinner\003 sedang dalam \00314\002$UnoWinsInARow\002\003 kemenangan beruntun!"
+    }
 }
 
 # last month's top3
@@ -1785,77 +1755,6 @@ proc UnoRecords {nick uhost hand chan txt} {
  if {![uno_ischan $chan]} {return}
  unochanmsg "Rekor Sepanjang Masa"
  unochanmsg "\00306Points:\003 $UnoRecordCard \00306 Games:\003 $UnoRecordWins \00306 Fast:\003 [lindex $UnoRecordFast 0] [UnoDuration [lindex $UnoRecordFast 1]] \00306 High Score:\003 $UnoRecordHigh \00306 Kartu dimainkan:\003 $UnoRecordPlayed \003"
- return
-}
-
-# current row (streak)
-proc UnoCurrentRow {nick uhost hand chan txt} {
- global UnoLastWinner UnoWinsInARow
- if {![uno_ischan $chan]} {return}
- if {($UnoLastWinner != "")&&($UnoWinsInARow > 0)} {
-  switch ($UnoWinsInARow) {
-   1 { unochanmsg "\0036$UnoLastWinner \003 telah menang \0030,6 $UnoWinsInARow game \003" }
-   default { unochanmsg "\0033$UnoLastWinner \003 is on a \0030,6 $UnoWinsInARow game streak \003" }
-  }
- }
- return
-}
-
-# month top10
-proc UnoTop10 {mode} {
- global UnoScoreFile unsortedscores UnoPointsName UnoRobot
-
- if {($mode < 0)||($mode > 2)} {set mode 0}
-
- switch $mode {
-  0 {set winners "Top10 Game Wins "}
-  1 {set winners "Top10 $UnoPointsName "}
-  2 {set winners "Top10 Blackjacks "}
- }
-
- if ![file exists $UnoScoreFile] {
-  set f [open $UnoScoreFile w]
-  puts $f "$UnoRobot 0 0 0"
-  unochanmsg "\0034Uno scores reset"
-  close $f
-  return
- } {
-  unomsg "$winners"
-  set winners ""
- }
-
- if [info exists unsortedscores] {unset unsortedscores}
- if [info exists top10] {unset top10}
-
- set f [open $UnoScoreFile r]
- while {[gets $f s] != -1} {
-  switch $mode {
-   0 {set unsortedscores([lindex [split $s] 0]) [lindex $s 1]}
-   1 {set unsortedscores([lindex [split $s] 0]) [lindex $s 2]}
-   2 {set unsortedscores([lindex [split $s] 0]) [lindex $s 3]}
-  }
- }
- close $f
-
- for {set s 0} {$s < 10} {incr s} {
-  set top10($s) "Nobody 0"
- }
-
- set s 0
- foreach n [lsort -decreasing -command uno_sortscores [array names unsortedscores]] {
-  set top10($s) "$n $unsortedscores($n)"
-  incr s
- }
-
- for {set s 0} {$s < 10} {incr s} {
-  if {[llength [lindex $top10($s) 0]] > 0} {
-   if {[lindex [split $top10($s)] 0] != "Nobody"} {
-    append winners "\0030,6 #[expr $s +1] \0030,10 [lindex [split $top10($s)] 0] [lindex $top10($s) 1] "
-   }
-  }
- }
-
- unomsg "$winners \003"
  return
 }
 
@@ -1998,187 +1897,207 @@ proc UnoNewMonth {min hour day month year} {
  return
 }
 
-# update score of winning player
-proc UnoUpdateScore {winner cardtotals blackjack} {
- global unogameswon unoptswon unoblackjackswon UnoScoreFile
-
- UnoReadScores
-
- if {[info exists unogameswon($winner)]} {
-  incr unogameswon($winner) 1
- } {
-  set unogameswon($winner) 1
- }
-
- if {[info exists unoptswon($winner)]} {
-  incr unoptswon($winner) $cardtotals
- } {
-  set unoptswon($winner) $cardtotals
- }
-
- if {$blackjack} {
-  if {[info exists unoblackjackswon($winner)]} {
-   incr unoblackjackswon($winner) 1
-  } {
-   set unoblackjackswon($winner) 1
-  }
- } {
-  if {![info exists unoblackjackswon($winner)]} {
-   set unoblackjackswon($winner) 0
-  }
- }
-
- set f [open $UnoScoreFile w]
- foreach n [array names unogameswon] {
-  puts $f "$n $unogameswon($n) $unoptswon($n) $unoblackjackswon($n)"
- }
- close $f
-
- return
-}
-
-# display winner and game statistics
-proc UnoWin {winner} {
- global UnoHand ThisPlayer RoundRobin UnoPointsName CardStats UnoMode UnoCycleTime
- global UnoFast UnoHigh UnoPlayed UnoBonus UnoWinDefault UnoDCCIDX UnoRobot UnoLastWinner UnoWinsInARow
- 
- # get time game finished
- set UnoTime [uno_gametime]
-
- set cardtotals 0
- set UnoMode 3
- set ThisPlayerIDX 0
- set needCFGWrite 0
- set isblackjack 0
- set cardtake 0
-
- # colour winner's nick
- set cnick [unonik $winner]
-
- #unomsg "\00306Card Totals"
-
- # total up all player's cards
- while {$ThisPlayerIDX != [llength $RoundRobin]} {
-  set Card ""
-  set ThisPlayer [lindex $RoundRobin $ThisPlayerIDX]
-  if [info exist UnoDCCIDX($ThisPlayer)] {unset UnoDCCIDX($ThisPlayer)}
-  if {$ThisPlayer != $winner} {
-   set ccount 0
-   while {[lindex $UnoHand($ThisPlayer) $ccount] != ""} {
-    set cardtotal [lindex $UnoHand($ThisPlayer) $ccount]
-    set c1 [string range $cardtotal 0 0]
-    set c2 [string range $cardtotal 1 1]
-    set cardtotal 0
-
-    if {$c1 == "W"} {
-     set cardtotal 50
-    } {
-     switch $c2 {
-      "S" {set cardtotal 20}
-      "R" {set cardtotal 20}
-      "D" {set cardtotal 20}
-      default {set cardtotal $c2}
-     }
+# === FUNGSI MENGHITUNG NILAI KARTU ===
+proc uno_cardvalue {card} {
+    set color [string range $card 0 0]
+    set type  [string range $card 1 1]
+    
+    if {$color == "W"} {
+        if {$type == "D"} {
+            return 50
+        }
+        return 50
     }
-    set cardtotals [expr $cardtotals + $cardtotal]
-    incr ccount
-   }
-   set Card [uno_cardcolorall $ThisPlayer]
-   unochanmsg "[unonik $ThisPlayer] \003 $Card"
-   #unochanmsg "[unonik $ThisPlayer] \003\[$ccount\] $Card"
-   incr cardtake $ccount
-  }
-  incr ThisPlayerIDX
- }
-
- set bonus 0
- set bbonus 0
-
- # bonuses not given for win by default
- if {$UnoWinDefault != 1} {
-  set HighScore [lindex $UnoHigh 1]
-  set HighPlayed [lindex $UnoPlayed 1]
-  set FastRecord [lindex $UnoFast 1]
-
-  # out with 21 adds blackjack bonus
-  if {$cardtotals == 21} {
-   set bbonus [expr $UnoBonus /2]
-   unochanmsg "$cnick\003 goes out on 21! \0034\002$bbonus\002\003 Blackjack Bonus $UnoPointsName"
-   incr bonus $bbonus
-   set isblackjack 1
-  }
-
-  # high score record
-  if {$cardtotals > $HighScore} {
-   unochanmsg "$cnick\003 mematahkan \002Rekor Skor Tertinggi\002 \00304$UnoBonus\003 bonus $UnoPointsName"
-   set UnoHigh "$winner $cardtotals"
-   incr bonus $UnoBonus
-  }
-
-  # played cards record
-  if {$CardStats(played) > $HighPlayed} {
-   unochanmsg "$cnick\003 mematahkan \002Rekor Kartu Terbanyak Dimainkan\002 \00304$UnoBonus\003 bonus $UnoPointsName"
-   set UnoPlayed "$winner $CardStats(played)"
-   incr bonus $UnoBonus
-  }
-
-  # fast game record
-  if {($UnoTime < $FastRecord)&&($winner != $UnoRobot)} {
-   unochanmsg "$cnick\003 mematahkan \002Rekor Permainan Tercepat\002 \00304$UnoBonus\003 bonus $UnoPointsName"
-   incr bonus $UnoBonus
-   set UnoFast "$winner $UnoTime"
-  }
- }
-
- # win streak bonus
- if {$winner == $UnoLastWinner} {
-  incr UnoWinsInARow
-  set RowMod [expr {$UnoWinsInARow %3}]
-  if {!$RowMod} {
-   set RowBonus [expr int((pow(2,($UnoWinsInARow/3)-1)*($UnoBonus/4)))]
-   unochanmsg "$cnick\003 telah menang \00314\002$UnoWinsInARow\002\003 berturut dan mendapatkan \00304\002$RowBonus\002\003 bonus $UnoPointsName"
-   incr bonus $RowBonus
-  }
- } {
-  if {($UnoLastWinner != "")&&($UnoWinsInARow > 1)} {
-   unochanmsg "$cnick\003 telah mengakhiri \002$UnoLastWinner\'\s\002 streak of \002$UnoWinsInARow\002 wins"
-  }
-  set UnoLastWinner $winner
-  set UnoWinsInARow 1
- }
-
- # show winner
- set msg "$cnick\003 memenangkan \00314\002$cardtotals\002\003 $UnoPointsName dengan mengambil \00314\002$cardtake\002\003 kartu"
-
- # add bonus
- if {$bonus} {
-  incr cardtotals $bonus
-  set needCFGWrite 1
-  append msg "  total:\00303\002$cardtotals\002\003 $UnoPointsName"
- }
-
- unochanmsg "$msg"
-
- # show game stats
- unochanmsg "\00314$CardStats(played)\003 kartu dimainkan dalam \00314[UnoDuration $UnoTime]\003"
-
- # write scores
- UnoUpdateScore $winner $cardtotals $isblackjack
-
- # write records
- if {$needCFGWrite} {UnoWriteCFG}
-
- return
+    
+    if {$type == "S" || $type == "R" || $type == "D"} {
+        return 20
+    }
+    
+    if {[string is integer -strict $type]} {
+        return $type
+    }
+    
+    return 0
 }
 
+# === MODIFIED: OPSI 2 - Pemenang = total nilai lawan + 50, Kalah = (nilai kartu × 2) ===
+proc UnoWin {winner} {
+    global UnoHand RoundRobin UnoPointsName UnoMode UnoCycleTime
+    global UnoFast UnoHigh UnoPlayed UnoBonus UnoWinDefault UnoDCCIDX UnoRobot
+    global UnoLastWinner UnoWinsInARow CardStats
+
+    set UnoMode 3
+    set ThisPlayerIDX 0
+    set needCFGWrite 0
+
+    set cnick [unonik $winner]
+
+    set total_loser_value 0
+    array set loser_values {}
+
+    foreach player $RoundRobin {
+        if {$player != $winner} {
+            set cards $UnoHand($player)
+            set player_value 0
+            foreach card $cards {
+                set val [uno_cardvalue $card]
+                set player_value [expr {$player_value + $val}]
+            }
+            set loser_values($player) $player_value
+            set total_loser_value [expr {$total_loser_value + $player_value}]
+        }
+    }
+
+    set winner_points [expr {$total_loser_value + 50}]
+
+    set msg "$cnick\003 memenangkan \00314\002$winner_points\002\003 $UnoPointsName"
+    unochanmsg "$msg"
+
+    if {$winner != $UnoRobot} {
+        UnoUpdateScore $winner $winner_points 0
+    }
+
+    foreach player $RoundRobin {
+        if {$player != $winner && $player != $UnoRobot} {
+            set player_value $loser_values($player)
+            set penalty [expr {$player_value * 2}]
+            UnoUpdateScore $player [expr {-$penalty}] 0
+            set cards_held [llength $UnoHand($player)]
+            unochanmsg "[unonik $player]\003 kalah! Memegang \00314\002$cards_held\002\003 kartu (nilai total \00314\002$player_value\002\003), dikurangi \00304\002$penalty\002\003 $UnoPointsName"
+        }
+    }
+
+    unochanmsg "\00314$CardStats(played)\003 kartu dimainkan dalam \00314[UnoDuration [uno_gametime]]\003"
+
+    if {$winner == $UnoLastWinner} {
+        incr UnoWinsInARow
+    } else {
+        if {$UnoLastWinner != ""} {
+            unochanmsg "$cnick\003 mengakhiri \002$UnoLastWinner\'\s\002 streak of \002$UnoWinsInARow\002 wins"
+        }
+        set UnoLastWinner $winner
+        set UnoWinsInARow 1
+    }
+
+    UnoCycle
+}
+
+# === MODIFIED: Update score dengan nilai positif/negatif ===
+proc UnoUpdateScore {player deltaPoints {blackjack 0}} {
+    global unogameswon unoptswon unoblackjackswon UnoScoreFile UnoRobot
+
+    if {$player == $UnoRobot} {
+        return
+    }
+
+    if [info exists unogameswon] { unset unogameswon }
+    if [info exists unoptswon] { unset unoptswon }
+    if [info exists unoblackjackswon] { unset unoblackjackswon }
+
+    if {[file exists $UnoScoreFile]} {
+        set f [open $UnoScoreFile r]
+        while {[gets $f s] != -1} {
+            set unogameswon([lindex [split $s] 0]) [lindex $s 1]
+            set unoptswon([lindex [split $s] 0]) [lindex $s 2]
+            set unoblackjackswon([lindex [split $s] 0]) [lindex $s 3]
+        }
+        close $f
+    }
+
+    if {![info exists unogameswon($player)]} { set unogameswon($player) 0 }
+    if {![info exists unoptswon($player)]} { set unoptswon($player) 0 }
+    if {![info exists unoblackjackswon($player)]} { set unoblackjackswon($player) 0 }
+
+    set unoptswon($player) [expr {$unoptswon($player) + $deltaPoints}]
+
+    if {$deltaPoints > 0} {
+        incr unogameswon($player)
+    }
+
+    set f [open $UnoScoreFile w]
+    foreach n [array names unogameswon] {
+        puts $f "$n $unogameswon($n) $unoptswon($n) $unoblackjackswon($n)"
+    }
+    close $f
+}
+
+# === LEADERBOARD 1 LINE DENGAN TOP 3 SAJA - WARNA 2 DIGIT ===
+proc UnoTop10OneLine {nick uhost hand chan txt} {
+    global UnoScoreFile unsortedscores UnoPointsName UnoRobot UnoChan
+
+    regsub -all \[`,.!{}\ ] $txt "" txt
+    set txt [string tolower [string range $txt 0 10]]
+    
+    set mode 1
+    set judul "POIN"
+    if {$txt == "games"} {
+        set mode 0
+        set judul "MENANG"
+    }
+
+    if {![file exists $UnoScoreFile]} {
+        unochanmsg "\00304Belum ada data skor. Ayo main!"
+        return
+    }
+
+    catch {unset unsortedscores}
+    set f [open $UnoScoreFile r]
+    while {[gets $f s] != -1} {
+        set player [lindex [split $s] 0]
+        if {$player == $UnoRobot} { continue }
+        
+        if {$mode == 0} {
+            set unsortedscores($player) [lindex $s 1]
+        } else {
+            set unsortedscores($player) [lindex $s 2]
+        }
+    }
+    close $f
+
+    if {[array size unsortedscores] == 0} {
+        unochanmsg "\00304Belum ada data pemain. Ayo main!"
+        return
+    }
+
+    set sorted [lsort -stride 2 -integer -decreasing -index 1 [array get unsortedscores]]
+    
+    set top3list ""
+    set rank 1
+    foreach {name score} $sorted {
+        if {$rank > 3} break
+        
+        if {$score < 0} {
+            set score_disp "\00304$score\003"
+        } else {
+            set score_disp "\00303$score\003"
+        }
+        
+        if {$rank == 1} {
+            set color "\00308"
+        } elseif {$rank == 2} {
+            set color "\00307"
+        } elseif {$rank == 3} {
+            set color "\00303"
+        } else {
+            set color "\0030"
+        }
+        
+        append top3list "$rank. ${color}$name\003 $score_disp  "
+        incr rank
+    }
+    
+    unochanmsg "\00306\[$judul\]\003 $top3list"
+}
+
+#
 # reshuffle deck
+#
 proc UnoShuffle {cardsneeded} {
  global UnoDeck DiscardPile
 
- # no need in shuffling if more cards remain than needed
  if {[llength $UnoDeck] >= $cardsneeded} { return }
 
- unochanmsg "\0034\002Re-shuffling deck\002"
+ unochanmsg "\00304\002Re-shuffling deck\002"
 
  set DeckLeft 0
  while {$DeckLeft < [llength $UnoDeck]} {
@@ -2286,11 +2205,11 @@ proc UnoScoreAdvertise {} {
  global UnoChan UnoAdNumber UnoRobot
 
  switch $UnoAdNumber {
-  0 {UnoTop10 1}
+  0 {UnoTop10OneLine $UnoRobot $UnoRobot none $UnoChan ""}
   1 {UnoLastMonthTop3 $UnoRobot none none $UnoChan 0}
-  2 {UnoTop10 0}
+  2 {UnoTop10OneLine $UnoRobot $UnoRobot none $UnoChan "games"}
   3 {UnoRecords $UnoRobot none none $UnoChan ""}
-  4 {UnoTop10 2}
+  4 {UnoTop10OneLine $UnoRobot $UnoRobot none $UnoChan ""}
   5 {UnoPlayed $UnoRobot none none $UnoChan ""}
   6 {UnoHighScore $UnoRobot none none $UnoChan ""}
   7 {UnoTopFast $UnoRobot none none $UnoChan ""}
@@ -2400,7 +2319,7 @@ proc uno_sortscores {s1 s2} {
 proc uno_gametime {} {
  global UnoStartTime
  set UnoCurrentTime [unixtime]
- set gt [expr ($UnoCurrentTime - $UnoStartTime)]
+ set gt [expr {$UnoCurrentTime - $UnoStartTime}]
  return $gt
 }
 
@@ -2420,10 +2339,10 @@ proc unocolornick {pnum} {
 proc unoget_ratio {num den} {
  set n 0.0
  set d 0.0
- set n [expr $n +$num]
- set d [expr $d +$den]
+ set n [expr $n + $num]
+ set d [expr $d + $den]
  if {!$d} {return 0}
- set ratio [expr (($n /$d) *100.0)]
+ set ratio [expr {($n / $d) * 100.0}]
  return $ratio
 }
 
@@ -2461,14 +2380,14 @@ proc unostrpad {str len} {
 proc UnoDuration {sec} {
   set s ""
   if {$sec >= 3600} {
-   set tmp [expr $sec / 3600]
+   set tmp [expr {$sec / 3600}]
    set s [format "%s\002%d\002h:" $s $tmp]
-   set sec [expr $sec - ($tmp*3600)]
+   set sec [expr {$sec - ($tmp * 3600)}]
   }
   if {$sec >= 60} {
-   set tmp [expr $sec / 60]
+   set tmp [expr {$sec / 60}]
    set s [format "%s\002%d\002m:" $s $tmp]
-   set sec [expr $sec - ($tmp*60)]
+   set sec [expr {$sec - ($tmp * 60)}]
   }
   if {$sec > 0} {
    set tmp $sec
@@ -2549,7 +2468,6 @@ proc uno_showwindefault {who} {
  unomsg "[unonik $who] \002\00309W\00312i\00313n\00308s $UnoLogo \002by default"
  set UnoWinDefault 1
 }
-
 
 #
 # channel and dcc output
@@ -2676,4 +2594,4 @@ UnoReadCFG
 
 UnoReadScores
 
-putlog "Uno.Tcl             edited by KocHi (uKi`) -: LoadeD :-"
+putlog "Uno.Tcl By Lemon : Winner = total loser value +50, Loser = value×2, Bot tanpa poin, .top10 1 line) loaded. Use .uno to start."
