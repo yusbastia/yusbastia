@@ -1,442 +1,358 @@
 const express = require('express');
 const irc = require('irc-upd');
-const shell = require('shelljs');
 const path = require('path');
 const fs = require('fs');
-const cors = require('cors');
-const { exec } = require('child_process');
-const util = require('util');
-const execPromise = util.promisify(exec);
+const { spawn } = require('child_process');
+const crypto = require('crypto');
 
 // ===================== KONFIGURASI =====================
 const config = {
     ytdlBin: "/usr/local/bin/yt-dlp",
     ffmpegBin: "/usr/bin/ffmpeg",
-    path: "/home/yuzu",
+    basePath: "/home/yuzu",
     downloadDir: "downloads",
-    // Base URL web server (dengan trailing slash)
-    linkdl: "http://47.250.210.218:2025/get/",
+    publicUrl: "http://47.250.210.218:2025/get/",
     cookiesFile: "/home/yuzu/eggdrop/cookies.txt",
-    tubeRest: 50,
-    tmark: "mp3",   // Nick bot di IRC
-    ytExtractorArgs: "youtube:player-client=default,mweb"
+    tmark: "Mp3",                // Nick IRC
+    maxQueue: 5,
+    maxFileSize: "50M",
+    bitrate: "128K",
+    proxy: "socks5://5.45.112.10:1080",  // Proxy, bisa dikosongkan jika tidak perlu
+    port: 3000,
+    socketTimeout: 15,            // Turunkan timeout jadi 15 detik
+    retries: 1                     // Cukup 1 kali percobaan ulang (tanpa proxy)
 };
 
-const DOWNLOAD_DIR = path.join(config.path, config.downloadDir);
-const PUBLIC_URL = config.linkdl;
+const DOWNLOAD_DIR = path.join(config.basePath, config.downloadDir);
 
-// Pastikan folder siap
-if (!fs.existsSync(DOWNLOAD_DIR)) {
-    shell.mkdir('-p', DOWNLOAD_DIR);
-    shell.chmod('755', DOWNLOAD_DIR);
-}
+// Pastikan folder ada
+if (!fs.existsSync(DOWNLOAD_DIR)) fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 
-// ===================== KONFIGURASI TAMBAHAN =====================
-const PORT = 3000; // Port untuk API dan web internal (tidak digunakan untuk publik)
-
-// Warna untuk console
-const colors = {
-    red: '\x1b[31m',
-    green: '\x1b[32m',
-    yellow: '\x1b[33m',
-    blue: '\x1b[34m',
-    cyan: '\x1b[36m',
-    purple: '\x1b[35m',
-    reset: '\x1b[0m'
-};
-
-// Emoji
-const emoji = {
-    music: '🎵',
-    download: '📥',
-    success: '✅',
-    error: '❌',
-    file: '📁',
-    size: '📊',
-    duration: '⏱️',
-    link: '🔗',
-    lemon: '🍋',
-    clock: '⏳',
-    search: '🔍',
-    wait: '⏸️',
-    fire: '🔥',
-    warning: '⚠️',
-    album: '💿',
-    cover: '🖼️'
-};
-
-// Tanda tangan baru
-const signature = "𝓨𝓾𝓼 𝓑𝓪𝓼𝓽𝓲𝓪𝓷 〰";
-
-const app = express();
-app.use(cors());
-app.use(express.json());
+// Sistem antrian
+const queue = [];
+let isProcessing = false;
 
 // Statistik
 const stats = {
     mp3: 0,
+    m4a: 0,
     mp4: 0,
-    search: 0,
-    totalDownloads: 0,
-    totalSize: 0,
+    total: 0,
+    errors: 0,
     startTime: Date.now()
 };
 
-console.log(`${colors.cyan}╔══════════════════════════════════════╗${colors.reset}`);
-console.log(`${colors.cyan}║${colors.yellow}     🍋 LEMON MP3 v7 ULTIMATE 🍋       ${colors.cyan}║${colors.reset}`);
-console.log(`${colors.cyan}╠══════════════════════════════════════╣${colors.reset}`);
-console.log(`${colors.cyan}║${colors.green}  ✨ Fitur Keren:${colors.reset}`);
-console.log(`${colors.cyan}║${colors.white}  • Download MP3/MP4${colors.reset}`);
-console.log(`${colors.cyan}║${colors.white}  • Box border keren${colors.reset}`);
-console.log(`${colors.cyan}║${colors.white}  • Auto-delete 60s${colors.reset}`);
-console.log(`${colors.cyan}║${colors.white}  • Progress bar${colors.reset}`);
-console.log(`${colors.cyan}║${colors.white}  • Metadata album & cover art${colors.reset}`);
-console.log(`${colors.cyan}║${colors.white}  • Statistics${colors.reset}`);
-console.log(`${colors.cyan}╚══════════════════════════════════════╝${colors.reset}`);
-
 // ===================== FUNGSI BANTU =====================
+function generateId() {
+    return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
 function formatSize(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    const units = ['KB', 'MB', 'GB', 'TB'];
+    const units = ['B', 'KB', 'MB', 'GB'];
     let size = bytes;
-    for (const unit of units) {
+    let unitIdx = 0;
+    while (size >= 1024 && unitIdx < units.length - 1) {
         size /= 1024;
-        if (size < 1024) {
-            return size.toFixed(1) + ' ' + unit;
+        unitIdx++;
+    }
+    return `${size.toFixed(1)} ${units[unitIdx]}`;
+}
+
+function getTimestamp() {
+    const now = new Date();
+    return `[${now.toLocaleDateString()} ${now.toLocaleTimeString()}]`;
+}
+
+// ===================== PROSES ANTRIAN =====================
+async function processQueue() {
+    if (isProcessing || queue.length === 0) return;
+    isProcessing = true;
+    const task = queue.shift();
+
+    console.log(`${getTimestamp()} Memproses task ${task.id} (${task.type})`);
+
+    try {
+        const result = await downloadWithRetry(task.query, task.type, task.id);
+        if (task.callback) task.callback(result);
+    } catch (err) {
+        console.error(`${getTimestamp()} Error task ${task.id}: ${err.message}`);
+        if (task.callback) task.callback({ success: false, error: err.message });
+    } finally {
+        isProcessing = false;
+        stats.total++;
+        processQueue();
+    }
+}
+
+function addToQueue(query, type, callback) {
+    if (queue.length >= config.maxQueue) {
+        return { success: false, error: 'Antrian penuh (maks 5). Silakan tunggu.' };
+    }
+    const id = generateId();
+    queue.push({ id, query, type, callback });
+    console.log(`${getTimestamp()} Task ${id} (${type}) sedang mencari 🔍. Antrian: ${queue.length}`);
+    processQueue();
+    return { success: true, id, position: queue.length };
+}
+
+// ===================== FUNGSI DOWNLOAD DENGAN RETRY =====================
+async function downloadWithRetry(query, type, taskId) {
+    // Percobaan pertama: tanpa proxy (lebih cepat jika proxy bermasalah)
+    try {
+        console.log(`${getTimestamp()} Percobaan 1 (tanpa proxy)`);
+        return await download(query, type, taskId, true); // withoutProxy = true
+    } catch (err) {
+        console.log(`${getTimestamp()} Percobaan 1 gagal: ${err.message}`);
+        // Jika error bukan karena koneksi, langsung berhenti
+        if (!err.message.includes('timed out') && !err.message.includes('Timeout') && !err.message.includes('Connection')) {
+            stats.errors++;
+            return { success: false, id: taskId, error: err.message };
+        }
+        // Percobaan kedua: dengan proxy (jika tersedia)
+        if (config.proxy) {
+            try {
+                console.log(`${getTimestamp()} Percobaan 2 (dengan proxy)`);
+                return await download(query, type, taskId, false); // with proxy
+            } catch (err2) {
+                console.log(`${getTimestamp()} Percobaan 2 gagal: ${err2.message}`);
+                stats.errors++;
+                return { success: false, id: taskId, error: err2.message };
+            }
+        } else {
+            stats.errors++;
+            return { success: false, id: taskId, error: err.message };
         }
     }
-    return 'Inf';
 }
 
-function formatDuration(seconds) {
-    if (!seconds || seconds === 'N/A') return 'N/A';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-function sanitizeFilename(str) {
-    return str.replace(/[\\/*?:"<>|]/g, '_').trim();
-}
-
-// ===================== FUNGSI DOWNLOAD =====================
-async function downloadWithYtDlp(query, type = 'mp3') {
+// ===================== FUNGSI DOWNLOAD UTAMA (REVISI) =====================
+function download(query, type = 'mp3', taskId, withoutProxy = false) {
+    const id = taskId || generateId();
     let input = query.trim();
     if (!input.startsWith('http')) input = `ytsearch1:${input}`;
 
-    console.log(`${colors.cyan}[Processing] ${input}${colors.reset}`);
+    let ext;
+    if (type === 'mp3') ext = 'mp3';
+    else if (type === 'm4a') ext = 'm4a';
+    else if (type === 'mp4') ext = 'mp4';
+    else throw new Error('Tipe tidak didukung');
 
-    try {
-        console.log(`${colors.cyan}${emoji.search} Mengambil info video...${colors.reset}`);
-        
-        const infoCmd = `${config.ytdlBin} --dump-json --cookies "${config.cookiesFile}" --no-warnings --extractor-args "${config.ytExtractorArgs}" "${input}"`;
-        const { stdout: infoStdout } = await execPromise(infoCmd);
-        
-        const videoInfo = JSON.parse(infoStdout);
-        const judul = videoInfo.title;
-        const durasi = videoInfo.duration || 'N/A';
-        const uploader = videoInfo.uploader || 'Unknown';
-        const views = videoInfo.view_count || 0;
+    // Bangun argumen untuk yt-dlp dengan parameter anti-captcha
+    let args = [
+        '--cookies', config.cookiesFile,
+        '--no-warnings',
+        '--restrict-filenames',
+        '--force-overwrites',
+        '-o', `${DOWNLOAD_DIR}/%(title)s.%(ext)s`,
+        '--max-filesize', config.maxFileSize,
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        '--sleep-requests', '1.5',
+        '--sleep-interval', '3',          // dinaikkan jadi 3 detik
+        '--max-sleep-interval', '7',       // dinaikkan jadi 7 detik
+        '--socket-timeout', config.socketTimeout.toString(),
+        // --- PARAMETER KHUSUS UNTUK BYPASS CAPTCHA & BLOKIR ---
+        '--extractor-args', 'youtube:player_client=web,tv',   // tiru request dari web & TV
+        '--remote-components', 'ejs:github',                  // unduh komponen JS terbaru untuk n-sig
+        // '--no-check-certificates',                         // (opsional) jika ada masalah SSL
+    ];
 
-        let downloadCmd = `${config.ytdlBin} --cookies "${config.cookiesFile}" --no-warnings --extractor-args "${config.ytExtractorArgs}" --restrict-filenames --force-overwrites -o "${config.path}/${config.downloadDir}/%(title)s.%(ext)s"`;
-        
-        if (type === 'mp3') {
-            // Konversi ke mp3, set kualitas, embed metadata (album diisi uploader), dan embed thumbnail
-            downloadCmd += ` -x --audio-format mp3 --audio-quality 128K --ffmpeg-location "${config.ffmpegBin}" --parse-metadata "uploader:%(album)s" --embed-metadata --embed-thumbnail`;
-        } else {
-            // Untuk mp4, embed metadata saja (album diisi uploader), thumbnail tidak diembed karena format video biasanya tidak mendukung cover art
-            downloadCmd += ` -f mp4 --parse-metadata "uploader:%(album)s" --embed-metadata`;
-        }
-        
-        downloadCmd += ` "${input}"`;
+    // Tambahkan PO Token jika server tersedia (ganti URL sesuai dengan server Anda)
+    // Pastikan server PO Token berjalan di 127.0.0.1:4416
+    args.push('--extractor-args', 'youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416');
 
-        console.log(`${colors.cyan}╭──────────────────────────────────────╮${colors.reset}`);
-        console.log(`${colors.cyan}│${colors.yellow}      ${type === 'mp3' ? emoji.music : '🎬'} ${type.toUpperCase()} DOWNLOADER ${type === 'mp3' ? emoji.music : '🎬'} ${colors.cyan}     │${colors.reset}`);
-        console.log(`${colors.cyan}├──────────────────────────────────────┤${colors.reset}`);
-        console.log(`${colors.cyan}│${colors.white}  ${emoji.file} Judul: ${colors.green}${judul.substring(0, 30)}...${colors.reset}`);
-        console.log(`${colors.cyan}│${colors.white}  ${emoji.duration} Durasi: ${colors.yellow}${durasi} detik${colors.reset}`);
-        console.log(`${colors.cyan}│${colors.white}  ${emoji.download} Mengunduh...${colors.reset}`);
-        if (type === 'mp3') {
-            console.log(`${colors.cyan}│${colors.white}  ${emoji.cover} Thumbnail akan diembed${colors.reset}`);
-        }
-        console.log(`${colors.cyan}╰──────────────────────────────────────╯${colors.reset}`);
-
-        await execPromise(downloadCmd);
-
-        const files = fs.readdirSync(DOWNLOAD_DIR)
-            .filter(f => f.endsWith(`.${type}`))
-            .map(f => ({
-                name: f,
-                path: path.join(DOWNLOAD_DIR, f),
-                time: fs.statSync(path.join(DOWNLOAD_DIR, f)).mtime.getTime()
-            }))
-            .sort((a, b) => b.time - a.time);
-
-        if (files.length === 0) {
-            throw new Error('File tidak ditemukan');
-        }
-
-        const latestFile = files[0];
-        const filePath = latestFile.path;
-        const fileName = latestFile.name;
-        const fileSize = fs.statSync(filePath).size;
-
-        stats[type]++;
-        stats.totalDownloads++;
-        stats.totalSize += fileSize;
-
-        fs.chmodSync(filePath, '644');
-
-        // Gunakan base URL yang sudah diatur (dengan /get/)
-        const url = config.linkdl + encodeURIComponent(fileName);
-        const sizeFormatted = formatSize(fileSize);
-        const viewsFormatted = views > 1000000 ? (views/1000000).toFixed(1) + 'M' : 
-                              views > 1000 ? (views/1000).toFixed(1) + 'K' : views;
-
-        console.log(`${colors.green}╭──────────────────────────────────────╮${colors.reset}`);
-        console.log(`${colors.green}│${colors.yellow}      ${emoji.success} DOWNLOAD SELESAI! ${emoji.success} ${colors.green}       │${colors.reset}`);
-        console.log(`${colors.green}├──────────────────────────────────────┤${colors.reset}`);
-        console.log(`${colors.green}│${colors.white}  ${emoji.file} File: ${colors.cyan}${fileName}${colors.reset}`);
-        console.log(`${colors.green}│${colors.white}  ${emoji.size} Ukuran: ${colors.yellow}${sizeFormatted}${colors.reset}`);
-        console.log(`${colors.green}│${colors.white}  ${emoji.duration} Durasi: ${colors.yellow}${formatDuration(durasi)}${colors.reset}`);
-        console.log(`${colors.green}│${colors.white}  👁️ Views: ${colors.purple}${viewsFormatted}${colors.reset}`);
-        console.log(`${colors.green}│${colors.white}  🎤 Uploader: ${colors.blue}${uploader}${colors.reset}`);
-        console.log(`${colors.green}│${colors.white}  ${emoji.album} Album: ${colors.magenta}${uploader}${colors.reset}`);
-        if (type === 'mp3') {
-            console.log(`${colors.green}│${colors.white}  ${emoji.cover} Cover art: ✅${colors.reset}`);
-        }
-        // Gabungkan link dengan signature (hanya spasi)
-        console.log(`${colors.green}│${colors.white}  ${emoji.link} Link: ${colors.blue}${url}  ${colors.purple}${signature}${colors.reset}`);
-        console.log(`${colors.green}╰──────────────────────────────────────╯${colors.reset}`);
-
-        console.log(`${colors.yellow}${emoji.clock} File akan dihapus dalam ${config.tubeRest} detik...${colors.reset}`);
-        setTimeout(() => {
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-                console.log(`${colors.yellow}🗑️ File ${fileName} telah dihapus.${colors.reset}`);
-            }
-        }, config.tubeRest * 1000);
-
-        return {
-            success: true,
-            url,
-            fileName,
-            size: sizeFormatted,
-            duration: formatDuration(durasi),
-            judul,
-            uploader,
-            views: viewsFormatted,
-            hasThumbnail: type === 'mp3',
-            filePath
-        };
-
-    } catch (error) {
-        console.log(`${colors.red}╭──────────────────────────────────────╮${colors.reset}`);
-        console.log(`${colors.red}│${colors.white}      ${emoji.error} ERROR ${emoji.error} ${colors.red}                   │${colors.reset}`);
-        console.log(`${colors.red}├──────────────────────────────────────┤${colors.reset}`);
-        console.log(`${colors.red}│${colors.white}  ${error.message}${colors.reset}`);
-        console.log(`${colors.red}╰──────────────────────────────────────╯${colors.reset}`);
-        return { success: false, error: error.message };
+    // Jika proxy digunakan (dan withoutProxy = false)
+    if (!withoutProxy && config.proxy) {
+        args.push('--proxy', config.proxy);
     }
+
+    // Penanganan format audio/video
+    if (type === 'mp3' || type === 'm4a') {
+        args.push('-x', '--audio-format', type, '--audio-quality', config.bitrate,
+                  '--ffmpeg-location', config.ffmpegBin,
+                  '--embed-metadata', '--embed-thumbnail', '--add-metadata',
+                  '--parse-metadata', 'uploader:%(album)s');
+    } else if (type === 'mp4') {
+        args.push('-f', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
+                  '--merge-output-format', 'mp4',
+                  '--embed-metadata');
+    }
+
+    args.push('--print-json', input);
+
+    console.log(`${getTimestamp()} Menjalankan: ${config.ytdlBin} ${args.join(' ').substring(0, 300)}...`);
+
+    return new Promise((resolve, reject) => {
+        const ytProcess = spawn(config.ytdlBin, args);
+        let stdout = '';
+        let stderr = '';
+
+        ytProcess.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+
+        ytProcess.stderr.on('data', (data) => {
+            stderr += data.toString();
+            // Tampilkan stderr agar terlihat progres (bisa dihapus jika ingin lebih tenang)
+            process.stderr.write(`[yt-dlp] ${data.toString()}`);
+        });
+
+        ytProcess.on('close', (code) => {
+            if (code !== 0) {
+                reject(new Error(stderr || `Process exited with code ${code}`));
+                return;
+            }
+
+            try {
+                const lines = stdout.trim().split('\n');
+                const jsonLine = lines[lines.length - 1];
+                const info = JSON.parse(jsonLine);
+
+                // Cari file terbaru
+                const files = fs.readdirSync(DOWNLOAD_DIR)
+                    .filter(f => f.endsWith(`.${ext}`))
+                    .map(f => ({
+                        name: f,
+                        path: path.join(DOWNLOAD_DIR, f),
+                        mtime: fs.statSync(path.join(DOWNLOAD_DIR, f)).mtimeMs
+                    }))
+                    .sort((a, b) => b.mtime - a.mtime);
+
+                if (files.length === 0) {
+                    reject(new Error('File tidak ditemukan setelah download'));
+                    return;
+                }
+
+                const file = files[0];
+                const fileSize = fs.statSync(file.path).size;
+                const url = config.publicUrl + encodeURIComponent(file.name);
+
+                // Update statistik
+                if (type === 'mp3') stats.mp3++;
+                else if (type === 'm4a') stats.m4a++;
+                else if (type === 'mp4') stats.mp4++;
+
+                // Hapus file setelah 60 detik
+                setTimeout(() => {
+                    if (fs.existsSync(file.path)) {
+                        fs.unlinkSync(file.path);
+                        console.log(`${getTimestamp()} File ${file.name} dihapus.`);
+                    }
+                }, 60000);
+
+                console.log(`${getTimestamp()} Berhasil: ${file.name} (${formatSize(fileSize)})`);
+
+                resolve({
+                    success: true,
+                    id,
+                    url,
+                    fileName: file.name,
+                    size: formatSize(fileSize),
+                    title: info.title,
+                    duration: info.duration ? `${Math.floor(info.duration / 60)}:${(info.duration % 60).toString().padStart(2, '0')}` : 'N/A',
+                    uploader: info.uploader || 'Unknown'
+                });
+            } catch (err) {
+                reject(new Error(`Gagal parse JSON: ${err.message}\nStdout: ${stdout.substring(0, 200)}`));
+            }
+        });
+
+        ytProcess.on('error', (err) => {
+            reject(err);
+        });
+    });
 }
 
-// ===================== API ROUTES =====================
+// ===================== API ENDPOINT =====================
+const app = express();
+app.use(express.json());
+
 app.post('/api/download', async (req, res) => {
     const { query, type = 'mp3' } = req.body;
-    if (!query) return res.status(400).json({ error: 'Query kosong' });
-    
-    const result = await downloadWithYtDlp(query, type);
-    if (result.success) {
-        res.json(result);
-    } else {
-        res.status(500).json({ error: result.error });
+    if (!query) return res.status(400).json({ error: 'Query diperlukan' });
+    if (!['mp3', 'm4a', 'mp4'].includes(type)) {
+        return res.status(400).json({ error: 'Tipe harus mp3, m4a, atau mp4' });
     }
+
+    const result = addToQueue(query, type, (downloadResult) => {});
+    if (!result.success) return res.status(429).json(result);
+
+    res.json({
+        success: true,
+        message: 'Ditambahkan ke antrian',
+        taskId: result.id,
+        position: result.position
+    });
 });
 
 app.get('/api/stats', (req, res) => {
     const uptime = Math.floor((Date.now() - stats.startTime) / 1000);
-    const uptimeFormatted = `${Math.floor(uptime / 3600)}j ${Math.floor((uptime % 3600) / 60)}m ${uptime % 60}d`;
-    
     res.json({
-        ...stats,
-        uptime: uptimeFormatted,
-        totalSizeFormatted: formatSize(stats.totalSize)
+        mp3: stats.mp3,
+        m4a: stats.m4a,
+        mp4: stats.mp4,
+        total: stats.total,
+        errors: stats.errors,
+        queue: queue.length,
+        processing: isProcessing,
+        uptime: `${Math.floor(uptime / 60)}m ${uptime % 60}s`
     });
-});
-
-app.get('/api/files', (req, res) => {
-    const files = fs.readdirSync(DOWNLOAD_DIR)
-        .filter(f => f.endsWith('.mp3') || f.endsWith('.mp4'))
-        .map(f => ({
-            name: f,
-            url: config.linkdl + encodeURIComponent(f),
-            size: formatSize(fs.statSync(path.join(DOWNLOAD_DIR, f)).size),
-            created: fs.statSync(path.join(DOWNLOAD_DIR, f)).mtime
-        }))
-        .sort((a, b) => b.created - a.created);
-    
-    res.json(files);
 });
 
 // ===================== BOT IRC =====================
 const bot = new irc.Client('irchat.online', config.tmark, {
     channels: ['#yobayat'],
     port: 6667,
-    secure: false,
     userName: config.tmark.toLowerCase(),
-    realName: `${config.tmark} MP3 Bot v7 (with cover art)`
+    realName: 'MP3/M4A/MP4 Downloader'
+});
+
+bot.addListener('registered', () => {
+    console.log(`${getTimestamp()} IRC connected as ${config.tmark}`);
 });
 
 bot.addListener('message', async (from, to, text) => {
-    const cleanText = text.replace(/\x1b\[[0-9;]*m/g, '');
+    const target = to.startsWith('#') ? to : from;
+    const cmd = text.trim();
 
-    // Command MP3
-    if (cleanText.startsWith('!mp3') || cleanText.startsWith('.mp3') || cleanText.startsWith('?mp3')) {
-        const q = cleanText.substring(5).trim();
-        if (!q) {
-            return bot.say(to, `${emoji.warning} ${from}, judul lagunya mana?`);
-        }
+    const handleDownload = (prefix, type) => {
+        const q = cmd.substring(prefix.length).trim();
+        if (!q) return bot.say(target, `Gunakan: ${prefix} <judul/link>`);
 
-        bot.say(to, `╭──────────────────────────────────────╮`);
-        bot.say(to, `│      🎵 LEMON MP3 BOT 🎵             │`);
-        bot.say(to, `├──────────────────────────────────────┤`);
-        bot.say(to, `│  Dari: ${from}`);
-        bot.say(to, `│  🔍 Mencari: ${q}`);
-        bot.say(to, `│  ⏸️ Mohon tunggu...`);
-        bot.say(to, `╰──────────────────────────────────────╯`);
+        const queueResult = addToQueue(q, type, (result) => {
+            if (result.success) {
+                bot.say(target, `✅ ${result.title} | Ukuran: ${result.size} | Durasi: ${result.duration} | Download: ${result.url} (File akan dihapus dalam 60 detik)`);
+            } else {
+                bot.say(target, `❌ Gagal: ${result.error.substring(0, 200)}`);
+            }
+        });
 
-        const result = await downloadWithYtDlp(q, 'mp3');
-
-        if (result.success) {
-            bot.say(to, `╭──────────────────────────────────────╮`);
-            bot.say(to, `│      ✅ FILE DI TEMUKAN! ✅           │`);
-            bot.say(to, `├──────────────────────────────────────┤`);
-            bot.say(to, `│  📁 File: ${result.fileName}`);
-            bot.say(to, `│  📊 Ukuran: ${result.size}`);
-            bot.say(to, `│  ⏱️ Durasi: ${result.duration}`);
-            bot.say(to, `│  💿 Album: ${result.uploader}`);
-            bot.say(to, `│  🖼️ Cover art: ✅ (terembed)`);
-            // Gabungkan link dengan signature (hanya spasi, tanpa "|")
-            bot.say(to, `│  🔗 Link: ${result.url}  ${signature}`);
-            bot.say(to, `╰──────────────────────────────────────╯`);
-            
-            bot.say(to, `⏳ File akan dihapus dalam ${config.tubeRest} detik...`);
-            
+        if (queueResult.success) {
+            bot.say(target, `⏳ Task ${queueResult.id} dalam antrian (posisi ${queueResult.position})`);
         } else {
-            bot.say(to, `╭──────────────────────────────────────╮`);
-            bot.say(to, `│      ❌ GAGAL ❌                      │`);
-            bot.say(to, `├──────────────────────────────────────┤`);
-            bot.say(to, `│  ${result.error}`);
-            bot.say(to, `╰──────────────────────────────────────╯`);
+            bot.say(target, `⚠️ ${queueResult.error}`);
         }
-    }
+    };
 
-    // Command MP4
-    if (cleanText.startsWith('!mp4') || cleanText.startsWith('.mp4')) {
-        const q = cleanText.substring(5).trim();
-        if (!q) {
-            return bot.say(to, `${emoji.warning} ${from}, judul videonya mana?`);
-        }
-
-        bot.say(to, `╭──────────────────────────────────────╮`);
-        bot.say(to, `│      🎬 LEMON MP4 BOT 🎬              │`);
-        bot.say(to, `├──────────────────────────────────────┤`);
-        bot.say(to, `│  Dari: ${from}`);
-        bot.say(to, `│  🔍 Mencari: ${q}`);
-        bot.say(to, `│  ⏸️ Mohon tunggu...`);
-        bot.say(to, `╰──────────────────────────────────────╯`);
-
-        const result = await downloadWithYtDlp(q, 'mp4');
-
-        if (result.success) {
-            bot.say(to, `╭──────────────────────────────────────╮`);
-            bot.say(to, `│      ✅ FILE DI TEMUKAN! ✅           │`);
-            bot.say(to, `├──────────────────────────────────────┤`);
-            bot.say(to, `│  📁 File: ${result.fileName}`);
-            bot.say(to, `│  📊 Ukuran: ${result.size}`);
-            bot.say(to, `│  ⏱️ Durasi: ${result.duration}`);
-            bot.say(to, `│  💿 Album: ${result.uploader}`);
-            // Gabungkan link dengan signature (hanya spasi)
-            bot.say(to, `│  🔗 Link: ${result.url}  ${signature}`);
-            bot.say(to, `╰──────────────────────────────────────╯`);
-            
-            bot.say(to, `⏳ File akan dihapus dalam ${config.tubeRest} detik...`);
-            
-        } else {
-            bot.say(to, `╭──────────────────────────────────────╮`);
-            bot.say(to, `│      ❌ GAGAL ❌                      │`);
-            bot.say(to, `├──────────────────────────────────────┤`);
-            bot.say(to, `│  ${result.error}`);
-            bot.say(to, `╰──────────────────────────────────────╯`);
-        }
-    }
-
-    // Command Help
-    if (cleanText === '!help' || cleanText === '.help' || cleanText === '?help') {
-        bot.say(to, `╔══════════════════════════════════════╗`);
-        bot.say(to, `║     🍋 LEMON MP3 COMMANDS 🍋         ║`);
-        bot.say(to, `╠══════════════════════════════════════╣`);
-        bot.say(to, `║  🎵 MUSIC`);
-        bot.say(to, `║  !mp3 <judul/link> - Download MP3`);
-        bot.say(to, `║  !mp4 <judul/link> - Download MP4`);
-        bot.say(to, `╠══════════════════════════════════════╣`);
-        bot.say(to, `║  📊 INFO`);
-        bot.say(to, `║  !stats - Statistik bot`);
-        bot.say(to, `║  !files - List file`);
-        bot.say(to, `╚══════════════════════════════════════╝`);
-    }
-
-    // Command Stats
-    if (cleanText === '!stats') {
+    if (/^[!.?]mp3\b/i.test(cmd)) handleDownload(cmd.match(/^[!.?]mp3/i)[0], 'mp3');
+    else if (/^[!.?]m4a\b/i.test(cmd)) handleDownload(cmd.match(/^[!.?]m4a/i)[0], 'm4a');
+    else if (/^[!.?]mp4\b/i.test(cmd)) handleDownload(cmd.match(/^[!.?]mp4/i)[0], 'mp4');
+    else if (cmd === '!queue') bot.say(target, `Antrian: ${queue.length} | Diproses: ${isProcessing ? 'Ya' : 'Tidak'}`);
+    else if (cmd === '!stats') {
         const uptime = Math.floor((Date.now() - stats.startTime) / 1000);
-        const uptimeFormatted = `${Math.floor(uptime / 3600)}j ${Math.floor((uptime % 3600) / 60)}m`;
-        
-        bot.say(to, `╔══════════════════════════════════════╗`);
-        bot.say(to, `║     📊 LEMON MP3 STATS 📊           ║`);
-        bot.say(to, `╠══════════════════════════════════════╣`);
-        bot.say(to, `║  🎵 MP3: ${stats.mp3}`);
-        bot.say(to, `║  🎬 MP4: ${stats.mp4}`);
-        bot.say(to, `║  📈 Total: ${stats.totalDownloads}`);
-        bot.say(to, `║  💾 Size: ${formatSize(stats.totalSize)}`);
-        bot.say(to, `║  ⏱️ Uptime: ${uptimeFormatted}`);
-        bot.say(to, `╚══════════════════════════════════════╝`);
-    }
-
-    // Command Files
-    if (cleanText === '!files') {
-        const files = fs.readdirSync(DOWNLOAD_DIR)
-            .filter(f => f.endsWith('.mp3') || f.endsWith('.mp4'))
-            .sort()
-            .slice(0, 5);
-
-        if (files.length === 0) {
-            bot.say(to, `📂 Folder kosong`);
-        } else {
-            bot.say(to, `╔══════════════════════════════════════╗`);
-            bot.say(to, `║     📁 FILE TERBARU                ║`);
-            bot.say(to, `╠══════════════════════════════════════╣`);
-            files.forEach((f, i) => {
-                bot.say(to, `║  ${i+1}. ${f.substring(0, 30)}`);
-            });
-            bot.say(to, `╚══════════════════════════════════════╝`);
-        }
+        bot.say(target, `MP3: ${stats.mp3} | M4A: ${stats.m4a} | MP4: ${stats.mp4} | Total: ${stats.total} | Error: ${stats.errors} | Uptime: ${Math.floor(uptime / 60)}m`);
+    } else if (cmd === '!help' || cmd === '.help') {
+        bot.say(target, 'Perintah: !mp3 <query>, !m4a <query>, !mp4 <query>, !queue, !stats');
     }
 });
 
 bot.addListener('error', (err) => {
-    console.log(`${colors.red}IRC Error: ${err}${colors.reset}`);
+    console.log(`IRC Error: ${err}`);
 });
 
 // ===================== JALANKAN SERVER =====================
-app.listen(PORT, () => {
-    console.log(`${colors.green}╔══════════════════════════════════════╗${colors.reset}`);
-    console.log(`${colors.green}║${colors.yellow}     🍋 ${config.tmark} ENGINE v7 READY 🍋      ${colors.green}║${colors.reset}`);
-    console.log(`${colors.green}╠══════════════════════════════════════╣${colors.reset}`);
-    console.log(`${colors.green}║${colors.white}  🌐 Port: ${colors.cyan}${PORT}${colors.reset}`);
-    console.log(`${colors.green}║${colors.white}  📁 Download: ${colors.cyan}${DOWNLOAD_DIR}${colors.reset}`);
-    console.log(`${colors.green}║${colors.white}  🔗 Public URL: ${colors.cyan}${PUBLIC_URL}${colors.reset}`);
-    console.log(`${colors.green}║${colors.white}  🤖 IRC Bot: ${colors.cyan}${config.tmark}@irchat.online${colors.reset}`);
-    console.log(`${colors.green}║${colors.white}  💿 Metadata: Album + Cover Art${colors.reset}`);
-    console.log(`${colors.green}║${colors.white}  ✍️ Signature: ${signature}${colors.reset}`);
-    console.log(`${colors.green}╚══════════════════════════════════════╝${colors.reset}`);
+app.listen(config.port, () => {
+    console.log(`${getTimestamp()} Server berjalan di port ${config.port}`);
+    console.log(`${getTimestamp()} Folder download: ${DOWNLOAD_DIR}`);
+    console.log(`${getTimestamp()} IRC bot: ${config.tmark}@irchat.online`);
+    console.log(`${getTimestamp()} Tipe didukung: mp3, m4a, mp4`);
 });
